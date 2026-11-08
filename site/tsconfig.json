@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@app/*": ["../src/*"],
+      "@tauri-apps/api/core": ["./src/mock/tauri-core.ts"],
+      "@tauri-apps/api/event": ["./src/mock/tauri-event.ts"],
+      "@tauri-apps/api/window": ["./src/mock/tauri-window.ts"],
+      "@tauri-apps/api/dpi": ["./src/mock/tauri-dpi.ts"],
+      "@tauri-apps/plugin-dialog": ["./src/mock/plugin-dialog.ts"],
+      "@tauri-apps/plugin-opener": ["./src/mock/plugin-opener.ts"],
+      "@tauri-apps/plugin-clipboard-manager": ["./src/mock/plugin-clipboard.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts", "../src/lib/types.ts", "../src/lib/nlp.ts", "../src/lib/time.ts"]
+}
