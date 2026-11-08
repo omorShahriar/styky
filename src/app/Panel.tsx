@@ -12,6 +12,7 @@ import type { Item } from "../lib/types";
 import { expandSpring } from "../lib/motion";
 import { CompletedSection } from "../components/CompletedSection";
 import { Editor } from "../components/Editor";
+import { SnoozeMenu } from "../components/SnoozeMenu";
 import { ItemRow } from "../components/ItemRow";
 import { PlainGroup } from "../components/PlainGroup";
 import { Toast } from "../components/Toast";
@@ -171,7 +172,22 @@ export default function Panel() {
   useEffect(() => {
     const { refresh, tick } = useStore.getState();
     void refresh();
-    const unlisten = [listen("items-changed", () => void refresh()), listen("settings-changed", () => void refresh())];
+    const unlisten = [
+      listen("items-changed", () => void refresh()),
+      listen("settings-changed", () => void refresh()),
+      // A toast body or "Custom..." click: open the panel at that item.
+      listen<{ id: string | null; snooze: boolean }>("focus-item", async (e) => {
+        const { id, snooze } = e.payload;
+        if (!id) return;
+        await useStore.getState().refresh();
+        const s = useStore.getState();
+        const item = s.items.find((i) => i.id === id);
+        if (!item) return;
+        s.focus(id);
+        s.expand(id);
+        if (snooze && item.status === "open") s.openSnooze(id, true);
+      }),
+    ];
     const timer = setInterval(tick, TICK_MS);
     return () => {
       clearInterval(timer);
@@ -250,6 +266,12 @@ export default function Panel() {
           e.preventDefault();
           if (focused.status === "done") void s.restore(focused.id);
           else s.completeAnimated(focused.id);
+          break;
+        case "s":
+        case "S":
+          if (!focused || focused.status === "done" || s.snoozeFor) return;
+          e.preventDefault();
+          s.openSnooze(focused.id);
           break;
         case "Delete":
           if (!focused) return;
@@ -332,6 +354,7 @@ export default function Panel() {
           <CompletedSection items={done} />
         </LayoutGroup>
       </main>
+      <SnoozeMenu />
       <Toast />
     </div>
   );

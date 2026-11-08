@@ -626,3 +626,38 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .draft .detail-inner .editor {
   margin-left: 0;
 }
+
+/* ---------- snooze popover ---------- */
+.snooze-menu {
+  position: fixed;
+  right: auto;
+  width: 224px;
+  z-index: 30;
+  transform-origin: top right;
+}
+.menu-item .grow {
+  flex: 1;
+}
+.menu-hint {
+  color: var(--label-3);
+  font-size: 12px;
+}
+.menu-item:not(:disabled):hover .menu-hint {
+  color: inherit;
+  opacity: 0.8;
+}
+.snooze-custom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s2);
+}
+.snooze-label {
+  color: var(--label-2);
+  font-size: 12px;
+}
+.snooze-custom-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
+}

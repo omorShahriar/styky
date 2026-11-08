@@ -4,6 +4,8 @@ import type { ImportResult, Item, ItemEdit } from "./types";
 export const api = {
   // window / system
   hidePanel: () => invoke<void>("hide_panel"),
+  hideQuickadd: () => invoke<void>("hide_quickadd"),
+  setQuickaddHotkey: (hotkey: string) => invoke<void>("set_quickadd_hotkey", { hotkey }),
   quit: () => invoke<void>("quit"),
   getAutostart: () => invoke<boolean>("get_autostart"),
   setAutostart: (enabled: boolean) => invoke<boolean>("set_autostart", { enabled }),

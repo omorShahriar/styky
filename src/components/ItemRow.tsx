@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react";
-import { Check, Copy, ExternalLink, GripVertical, Pencil, Repeat as RepeatIcon, Trash2 } from "lucide-react";
+import { AlarmClock, Check, Copy, ExternalLink, GripVertical, Pencil, Repeat as RepeatIcon, Trash2 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { api } from "../lib/api";
@@ -44,6 +44,7 @@ export function ItemRow({ item, reorderable, onDragEnd }: Props) {
     completeAnimated,
     restore,
     remove,
+    openSnooze,
     showToast,
   } = useStore();
   const controls = useDragControls();
@@ -207,6 +208,11 @@ export function ItemRow({ item, reorderable, onDragEnd }: Props) {
           )}
         </div>
         <div className="quick">
+          {!done && (
+            <button type="button" className="icon-btn sm" title="Snooze (S)" aria-label="Snooze" onClick={(e) => { e.stopPropagation(); openSnooze(item.id); }}>
+              <AlarmClock size={13} strokeWidth={2} />
+            </button>
+          )}
           {item.link && (
             <button type="button" className="icon-btn sm" title="Open link" aria-label="Open link" onClick={(e) => { e.stopPropagation(); openLink(); }}>
               <ExternalLink size={13} strokeWidth={2} />
@@ -268,6 +274,9 @@ export function ItemRow({ item, reorderable, onDragEnd }: Props) {
                     </div>
                   )}
                   <div className="detail-actions">
+                    <button type="button" className="btn" onClick={() => openSnooze(item.id)}>
+                      <AlarmClock size={13} strokeWidth={2} /> Snooze
+                    </button>
                     <button type="button" className="btn" onClick={() => setEditing(true)}>
                       <Pencil size={13} strokeWidth={2} /> Edit
                     </button>

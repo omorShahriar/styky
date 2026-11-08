@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api } from "./api";
+import { formatDue } from "./time";
 import type { Item } from "./types";
 
 export interface Toast {
@@ -23,9 +24,14 @@ interface State {
   draft: { id: string | null } | null;
   completedOpen: boolean;
   toast: Toast | null;
+  /** the item whose snooze menu is open (custom = open on the custom picker) */
+  snoozeFor: { id: string; custom: boolean } | null;
   /** ids whose check is drawing in before they actually complete */
   checking: string[];
 
+  openSnooze: (id: string, custom?: boolean) => void;
+  closeSnooze: () => void;
+  snooze: (id: string, until: number) => Promise<void>;
   refresh: () => Promise<void>;
   tick: () => void;
   focus: (id: string | null) => void;
@@ -60,6 +66,20 @@ export const useStore = create<State>((set, get) => ({
   completedOpen: false,
   toast: null,
   checking: [],
+  snoozeFor: null,
+
+  openSnooze: (id, custom = false) => set({ snoozeFor: { id, custom }, focusedId: id }),
+  closeSnooze: () => set({ snoozeFor: null }),
+  snooze: async (id, until) => {
+    set({ snoozeFor: null });
+    try {
+      await api.snoozeItem(id, until);
+      await get().refresh();
+      get().showToast(`Snoozed until ${formatDue(until, Date.now())}`);
+    } catch (e) {
+      get().showToast(String(e));
+    }
+  },
 
   refresh: async () => {
     try {

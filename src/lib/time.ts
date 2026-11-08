@@ -71,3 +71,33 @@ export function fromLocalInput(v: string): number | null {
   const t = new Date(v).getTime();
   return Number.isNaN(t) ? null : t;
 }
+
+export interface SnoozePreset {
+  /** Same ids the toast dropdown uses (`snooze.rs`). */
+  id: "10m" | "1h" | "evening" | "tomorrow";
+  label: string;
+  until: number;
+}
+
+/** 10 min · 1 hour · This evening (18:00, or tomorrow's once past) · Tomorrow 09:00. */
+export function snoozePresets(now: number): SnoozePreset[] {
+  const evening = new Date(now);
+  evening.setHours(18, 0, 0, 0);
+  if (evening.getTime() <= now) evening.setDate(evening.getDate() + 1);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+  return [
+    { id: "10m", label: "10 minutes", until: now + 10 * MIN },
+    { id: "1h", label: "1 hour", until: now + HOUR },
+    { id: "evening", label: "This evening", until: evening.getTime() },
+    { id: "tomorrow", label: "Tomorrow morning", until: tomorrow.getTime() },
+  ];
+}
+
+/** Clock time of a snooze target, e.g. "18:00" or "Tomorrow 09:00". */
+export function snoozeHint(until: number, now: number): string {
+  const t = timeFmt.format(until);
+  const days = Math.round((startOfDay(until) - startOfDay(now)) / 86_400_000);
+  return days <= 0 ? t : `Tomorrow ${t}`;
+}

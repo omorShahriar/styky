@@ -1,0 +1,97 @@
+/* Quick-add bar: the window itself is Acrylic; this is only the tint, hairline and layout. */
+.qa {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-tint);
+  border-radius: var(--r-panel);
+  box-shadow: inset 0 0 0 0.5px var(--panel-edge);
+  overflow: hidden;
+}
+.qa-bar {
+  flex: none;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s5);
+}
+.qa-icon {
+  flex: none;
+  color: var(--label-2);
+}
+.qa-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  font-size: 18px;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+  user-select: text;
+  cursor: text;
+}
+.qa-input::placeholder {
+  color: var(--label-3);
+}
+.qa-kbd {
+  flex: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--label-3);
+  padding: 1px 6px;
+  border-radius: var(--r-chip);
+  background: var(--fill);
+}
+.qa-chips {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--s2);
+  height: 36px;
+  padding: 0 var(--s5) var(--s1) 52px;
+  border-top: 0.5px solid var(--hairline);
+  padding-top: var(--s1);
+  overflow: hidden;
+  animation: qa-in var(--dur-pop) var(--ease-out);
+}
+@keyframes qa-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+.qa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 var(--s2);
+  border-radius: var(--r-chip);
+  background: var(--fill);
+  color: var(--label-2);
+  font-size: 12px;
+  white-space: nowrap;
+  font-feature-settings: "tnum", "cv11";
+}
+.qa-chip.date {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.qa-chip.urgent {
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+  color: var(--red);
+}
+.qa-chip.branch {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.qa-error {
+  color: var(--red);
+  font-size: 12px;
+}
