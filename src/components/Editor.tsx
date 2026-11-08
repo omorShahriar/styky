@@ -190,7 +190,7 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
 
       <div className="ed-field">
         <span className="ed-label">
-          Remind early {!pro && <ProPill />}
+          Early alert {!pro && <ProPill />}
         </span>
         <select
           className="ed-input"
@@ -209,7 +209,9 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
       </div>
 
       <div className="ed-field">
-        <span className="ed-label">Priority</span>
+        <span className="ed-label">
+          Priority {!pro && <ProPill title="Critical priority is part of Styky Pro" />}
+        </span>
         <div className="segmented" role="radiogroup" aria-label="Priority">
           {PRIORITIES.map((p) => (
             <button
@@ -218,6 +220,7 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
               role="radio"
               aria-checked={edit.priority === p.value}
               className={edit.priority === p.value ? "on" : ""}
+              title={p.value === 3 ? (pro ? "Keeps notifying until done or snoozed" : "Critical keeps notifying until done: part of Styky Pro") : undefined}
               onClick={() => {
                 if (p.value === 3 && !pro) void api.openSettingsPro();
                 else patch({ priority: p.value });
@@ -227,7 +230,6 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
                 <motion.span layoutId="prio-thumb" className="thumb" transition={pressSpring} />
               )}
               <span className="seg-label">{p.label}</span>
-              {p.value === 3 && !pro && <ProPill />}
             </button>
           ))}
         </div>

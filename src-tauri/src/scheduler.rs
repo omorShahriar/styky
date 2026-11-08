@@ -172,39 +172,42 @@ async fn run(app: AppHandle, wake: Arc<Notify>) {
                 Ok(items) => {
                     let (esc, bring_forward) = escalation(&db);
                     let p = plan(&items, now, esc);
-                    if !p.pre.is_empty() {
-                        let ids: Vec<String> = p.pre.iter().map(|i| i.id.clone()).collect();
-                        if let Err(e) = db.mark_pre_fired(&ids, now) {
-                            eprintln!("styky: mark_pre_fired failed: {e}");
-                        }
-                        for item in &p.pre {
-                            notify::show_prealert(&app, item);
-                        }
+                    // Mark first (in the DB): a slow or hung toast must never lead to a second one.
+                    let ids = |v: &[Item]| v.iter().map(|i| i.id.clone()).collect::<Vec<String>>();
+                    if let Err(e) = db.mark_pre_fired(&ids(&p.pre), now) {
+                        eprintln!("styky: mark_pre_fired failed: {e}");
                     }
-                    if !p.nag.is_empty() {
-                        let ids: Vec<String> = p.nag.iter().map(|i| i.id.clone()).collect();
-                        if let Err(e) = db.mark_nagged(&ids, now) {
-                            eprintln!("styky: mark_nagged failed: {e}");
-                        }
-                        for item in &p.nag {
-                            notify::show_nag(&app, item);
-                        }
-                        if bring_forward {
-                            crate::window::show_panel(&app);
-                        }
+                    if let Err(e) = db.mark_nagged(&ids(&p.nag), now) {
+                        eprintln!("styky: mark_nagged failed: {e}");
                     }
-                    if !p.due.is_empty() {
-                        let ids: Vec<String> = p.due.iter().map(|i| i.id.clone()).collect();
-                        // Mark first: a slow toast must never lead to a second one.
-                        if let Err(e) = db.mark_fired(&ids, now) {
-                            eprintln!("styky: mark_fired failed: {e}");
-                        }
-                        let (missed, fresh) = split_missed(p.due, now, catching_up);
-                        if !missed.is_empty() {
-                            notify::show_summary(&app, &missed);
-                        }
-                        for item in &fresh {
-                            notify::show_item(&app, item);
+                    if let Err(e) = db.mark_fired(&ids(&p.due), now) {
+                        eprintln!("styky: mark_fired failed: {e}");
+                    }
+                    let (missed, fresh) = split_missed(p.due, now, catching_up);
+                    let (pre, nag) = (p.pre, p.nag);
+                    if !(pre.is_empty() && nag.is_empty() && missed.is_empty() && fresh.is_empty()) {
+                        // Toasts go through WinRT; show them off the loop and never wait on them for long,
+                        // so one stuck notification cannot freeze the scheduler.
+                        let app2 = app.clone();
+                        let shown = tauri::async_runtime::spawn_blocking(move || {
+                            for item in &pre {
+                                notify::show_prealert(&app2, item);
+                            }
+                            for item in &nag {
+                                notify::show_nag(&app2, item);
+                            }
+                            if !nag.is_empty() && bring_forward {
+                                crate::window::show_panel(&app2);
+                            }
+                            if !missed.is_empty() {
+                                notify::show_summary(&app2, &missed);
+                            }
+                            for item in &fresh {
+                                notify::show_item(&app2, item);
+                            }
+                        });
+                        if tokio::time::timeout(Duration::from_secs(10), shown).await.is_err() {
+                            eprintln!("styky: showing notifications is taking longer than 10 s; continuing");
                         }
                     }
                     catching_up = false;

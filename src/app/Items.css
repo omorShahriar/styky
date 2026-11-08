@@ -457,7 +457,12 @@
   gap: var(--s2);
 }
 .ed-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
   font-size: 12px;
+  line-height: 16px;
   color: var(--label-2);
 }
 .ed-input {
@@ -499,7 +504,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   padding: 2px;
   border-radius: var(--r-btn);
   background: var(--fill);

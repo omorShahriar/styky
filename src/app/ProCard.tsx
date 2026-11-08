@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { useLicense } from "../lib/pro";
 
 const BENEFITS = [
-  "Local API, `styky` CLI and AI connectors (Claude, ChatGPT, any MCP client)",
+  "Local API, the styky CLI and AI connectors (Claude, ChatGPT, any MCP client)",
   "Pre-alerts and Critical reminders that keep nagging until you act",
   "Themes: tint, transparency, density, accent, a sticky-note skin",
   "Advanced repeats: every 2 weeks, Mon/Wed/Fri, last Friday of the month, end after N",
