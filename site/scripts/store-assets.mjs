@@ -43,8 +43,8 @@ async function art(w, h, name, { iconFrac, iconY, titleY, tagline }) {
   <rect width="${w}" height="${h}" fill="url(#bg)"/>
   <rect width="${w}" height="${h}" fill="url(#glow)"/>
   <svg x="${x}" y="${y}" width="${s}" height="${s}" viewBox="0 0 1024 1024">${inner}</svg>
-  <text x="${w / 2}" y="${Math.round(h * titleY)}" text-anchor="middle" font-family="${font}" font-weight="700"
-        font-size="${title}" letter-spacing="${-title * 0.02}" fill="#f5f5f7">Styky</text>
+  ${titleY === null ? "" : `<text x="${w / 2}" y="${Math.round(h * titleY)}" text-anchor="middle" font-family="${font}" font-weight="700"
+        font-size="${title}" letter-spacing="${-title * 0.02}" fill="#f5f5f7">Styky</text>`}
   ${tagline ? tagline.map((t, i) => `<text x="${w / 2}" y="${Math.round(h * titleY + title * 0.75 + i * sub * 1.35)}" text-anchor="middle"
         font-family="${font}" font-size="${sub}" fill="#f5f5f7" fill-opacity="0.62">${t}</text>`).join("") : ""}
 </svg>`;
@@ -60,4 +60,6 @@ await art(1440, 2160, "poster-art-1440x2160.png", {
   iconFrac: 0.5, iconY: 0.22, titleY: 0.68,
   tagline: ["The reminders you can’t", "afford to forget,", "always on your desktop."],
 });
+// 16:9 Super hero art: the Store forbids the product title here, so icon only.
+await art(3840, 2160, "super-hero-art-3840x2160.png", { iconFrac: 0.42, iconY: 0.29, titleY: null });
 console.log(`wrote store art to ${out}`);
