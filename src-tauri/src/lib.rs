@@ -74,6 +74,7 @@ pub fn run() {
             let handle = app.handle().clone();
             let db_path = app.path().app_data_dir()?.join("styky.db");
             app.manage(db::Db::open(&db_path).map_err(|e| format!("cannot open {db_path:?}: {e}"))?);
+            first_run_autostart(&handle);
             let win = app
                 .get_webview_window(window::MAIN)
                 .expect("main window is declared in tauri.conf.json");
@@ -149,6 +150,19 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Styky");
+}
+
+/// Release builds turn "launch at login" on once, the first time they run; after that the user's choice wins.
+fn first_run_autostart(app: &tauri::AppHandle) {
+    if tauri::is_dev() {
+        return;
+    }
+    let db = app.state::<db::Db>();
+    let seen = db.settings().map(|s| s.contains_key("autostart_initialized")).unwrap_or(true);
+    if !seen {
+        commands::apply_autostart(app, true);
+        let _ = db.set_setting("autostart_initialized", "1");
+    }
 }
 
 /// Visibility/decorations are owned by us, not restored from disk.

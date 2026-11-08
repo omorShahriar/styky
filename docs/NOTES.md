@@ -192,3 +192,6 @@ Deviations / decisions:
 - **Motion**: the springs, completion choreography (check, 250 ms, collapse), `:focus-visible` rings, press scale and empty state already existed from
   M1-M3; M4 added: reduced-motion fades for the motion springs/variants (`lib/motion.ts` reads `prefers-reduced-motion` at load), a global 0.97 press on
   menu items / toast actions, an empty state that shows the configured hotkey, and a spring-animated segmented control and switch in Settings.
+- **Launch at login defaults to ON** in release builds: first run with no `autostart_initialized` setting enables autostart and sets it to `1`
+  (`first_run_autostart` in `lib.rs`); afterwards the user's choice is never overridden. Not applied in `tauri dev`. A replace-import that
+  wipes settings would re-run this once.
