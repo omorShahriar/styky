@@ -25,7 +25,6 @@
         "resizable": true,
         "maximizable": false,
         "minimizable": false,
-        "alwaysOnBottom": true,
         "visible": false
       }
     ],

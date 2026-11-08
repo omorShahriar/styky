@@ -1,14 +1,21 @@
 mod commands;
+#[cfg(windows)]
+mod desktop;
 mod theme;
 mod tray;
 mod window;
 
 use tauri::{Manager, WindowEvent};
-use tauri_plugin_window_state::StateFlags;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
+
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+
+/// Bumped on every move/resize; lets the debounced saver know if it is stale.
+static MOVE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 pub fn run() {
-    // Visibility/decorations are owned by us, not restored from disk.
-    let state_flags = StateFlags::all() & !StateFlags::VISIBLE & !StateFlags::DECORATIONS;
+    let flags = state_flags();
 
     tauri::Builder::default()
         // A second launch just brings the existing panel forward.
@@ -17,7 +24,7 @@ pub fn run() {
         }))
         .plugin(
             tauri_plugin_window_state::Builder::default()
-                .with_state_flags(state_flags)
+                .with_state_flags(flags)
                 .build(),
         )
         .plugin(tauri_plugin_autostart::init(
@@ -53,6 +60,8 @@ pub fn run() {
             if let Some(watcher) = theme::watch(&handle) {
                 app.manage(watcher);
             }
+            #[cfg(windows)]
+            desktop::spawn_watcher(handle.clone());
             tray::build(&handle)?;
             Ok(())
         })
@@ -64,7 +73,19 @@ pub fn run() {
                 // Close = hide. Quit is only available from the tray / menu.
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
+                    let _ = win.app_handle().save_window_state(state_flags());
                     let _ = win.hide();
+                }
+                // Persist size/position shortly after the user stops dragging.
+                WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+                    let seq = MOVE_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+                    let app = win.app_handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(Duration::from_millis(600));
+                        if MOVE_SEQ.load(Ordering::SeqCst) == seq {
+                            let _ = app.save_window_state(state_flags());
+                        }
+                    });
                 }
                 // Drop back to the desktop layer as soon as focus is lost.
                 WindowEvent::Focused(false) => {
@@ -77,6 +98,11 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Styky");
+}
+
+/// Visibility/decorations are owned by us, not restored from disk.
+fn state_flags() -> StateFlags {
+    StateFlags::all() & !StateFlags::VISIBLE & !StateFlags::DECORATIONS
 }
 
 fn has_saved_state(app: &tauri::AppHandle) -> bool {
