@@ -82,7 +82,7 @@ awkward for WebView2; not worth losing the glass.
 Deviations / decisions:
 - **Snooze UI and the `S` key are not in M2** (they belong with the M3 SnoozeMenu). The `snooze_item` command exists and is tested.
 - **Monthly repeat drift:** within one catch-up the day-of-month is anchored (31st stays 31st), but across completions there is no
-  stored anchor (schema is fixed by the plan), so Jan 31 -> Feb 28 -> Mar 28. Fix would need an extra column (migration v2).
+  stored anchor (schema is fixed by the plan), so Jan 31 -> Feb 28 -> Mar 28. Fixed in M3 (migration v2, `repeat_anchor_day`).
 - Drag-reorder applies to the trailing group of plain items (no due, not urgent), the only ones ordered by `sort_order`.
 - `react-markdown` runs through `rehype-sanitize` (GitHub schema plus `checked`); task boxes are our own buttons that call
   `toggleTaskLine(source, line)` using the `li` node position, so exactly one source line is rewritten (vitest-covered).
@@ -95,47 +95,78 @@ Not verified by hand: light theme, mouse drag-reorder, the native file dialogs b
 round-tripped live), and real keyboard hardware (keys were injected via CDP). CRUD, reorder, repeat roll-forward and export/replace-import
 were verified against the running app, including across a restart (see `scripts/cdp.mjs`).
 
-## Handoff (for the next implementor)
+## M3 notes (reminders and capture)
+
+Deviations / decisions:
+- **Toasts do not use `tauri-winrt-notification`.** v0.8.1 only has buttons: no `<input type="selection">`, and `on_activated` hands back only
+  the button arguments, never the dropdown value. `notify.rs` builds the toast XML itself and shows it through the `windows` crate
+  (features `UI_Notifications`, `Data_Xml_Dom`, `Foundation_Collections`); the crate dependency was dropped. Toast: title, "Due Today 17:00",
+  "#tag", `scenario="reminder"` (stays until dismissed), a Snooze dropdown (10 min, 1 hour, This evening 18:00, Tomorrow 09:00, Custom...) + **Snooze**
+  and **Done** buttons. Body click = open the panel at the item. **Custom...** opens the panel with the custom picker.
+- **AUMID**: Tauri's NSIS template stamps its Start-menu/desktop shortcuts with `BUNDLEID` (read from the CLI binary), so a release build uses
+  `com.styky.app`. In `tauri dev` (`tauri::is_dev()`) the PowerShell AUMID is used and the toast says "Windows PowerShell".
+- Activation callbacks are in-process only. A toast left in Action Center after Styky quits does nothing when clicked (Windows may launch
+  the app with the toast arguments; not handled).
+- **Scheduler** (`scheduler.rs`): a pass reads the wall clock, fires every open item with `effective_at <= now` and `last_fired_at < effective_at`
+  (marks first, then toasts), sleeps min(next due, 30 s) and wakes on `items-changed`. "Catch-up" mode (app start, a >90 s wall-clock gap =
+  sleep/resume, clock set back, end of a pause) summarises items due more than 60 s ago in ONE toast ("3 reminders were due") when there are two
+  or more; a single missed one is a normal toast. A repeating item that was ignored is not advanced; it stays overdue until completed.
+- **Pause reminders 1h**: tray item toggles to "Resume reminders (paused until HH:MM)". In-memory only (resets on restart).
+- **Snooze presets** (`snooze.rs`, `lib/time.ts`): "This evening" = today 18:00, or tomorrow 18:00 once it is past 18:00.
+- **Quick-add**: `quickadd` window declared in `tauri.conf.json` (560x64, grows to 100 high when chips show), own capability `capabilities/quickadd.json`.
+  Hotkey from setting `quickadd_hotkey` (default `Ctrl+Alt+N`, now in `DEFAULT_SETTINGS`); `set_quickadd_hotkey` command rebinds it (for the M4 recorder).
+  It calls `desktop::suspend(true/false)`; shown centred horizontally at 28 % height on the monitor under the cursor. Blur, Esc and Enter hide it.
+  Tray has a **Quick add** item.
+- **NL grammar** (`lib/nlp.ts`, documented at the top): `!!` urgent (2), `!` explicit normal (1, shows a "Normal" chip), `!low` low (0); `#tag`; `@branch`;
+  URL -> `link`; `every day|weekday|week|month`; any chrono-node date. Date without a time = 09:00; repeat without a date = next 09:00 (skipping
+  the weekend for weekdays). `@`/`#` must start a word, so e-mail addresses and "C#" are left alone.
+- Snooze UI: one popover (`SnoozeMenu`, fixed-positioned so the list never clips it) opened from the row hover clock, the expanded **Snooze** button,
+  the `S` key, or a toast's Custom... (`focus-item` event, `{id, snooze}`). Items now carry `repeatAnchorDay` (null unless monthly).
+- Export version is still 1; `repeatAnchorDay` is `serde(default)` so older exports import fine.
+
+Verified against the running dev build (CDP + synthesized keys): `Ctrl+Alt+N` shows the bar focused; chips for
+"Rotate keys fri 10am #infra every month !!" are right; Enter creates the item (monthly, anchor 13) and hides; Esc hides; the snooze popover lists the presets and
+snoozes. The scheduler fired a test item 10 ms after its due time and wrote `last_fired_at`; Windows toast history for the dev AUMID confirms the toast was delivered
+(`scripts/opennc.ps1`, `toastclick.ps1` are the helpers I used).
+
+**Not verified**: clicking **Done**, **Snooze** (dropdown) or the body on a real toast, and seeing the toast on screen. Screen access was denied for this session
+and the banner/Action Center did not appear in UI Automation, so only delivery to the toast history was confirmed. The parsing of the activation
+(`parse_action`) and the DB effects are unit-tested. Also not checked: sleep/resume catch-up and the startup summary toast on a real machine
+(logic unit-tested), the installed-build AUMID, light theme for the new UI, hotkey conflicts (a failed registration only logs to stderr).
+
+## Handoff (for the next implementor, M4)
 
 **Rust modules** (`src-tauri/src/`)
-- `lib.rs` builder, plugins, setup, window events (close-to-hide, debounced state save) / `commands.rs` every `#[tauri::command]`
-- `db.rs` rusqlite store, `user_version` migrations, CRUD/complete/snooze/reorder/purge/export/import (+ tests) / `model.rs` Item, ItemEdit, ExportFile
-- `sort.rs` list order (+ tests) / `repeat.rs` next-occurrence (+ tests) / `window.rs` material, positioning, show/hide
-- `desktop.rs` z-order + Show-Desktop watcher / `theme.rs` Windows accent + watcher / `tray.rs` tray icon and menu
+- `lib.rs` builder, plugins, setup, window events / `commands.rs` every `#[tauri::command]` / `db.rs` rusqlite store, migrations v1+v2, CRUD, `list_open`, `mark_fired` / `model.rs` Item, ItemEdit, ExportFile
+- `sort.rs` / `repeat.rs` (next occurrence, monthly anchor) / `snooze.rs` presets / `scheduler.rs` due engine + pause / `notify.rs` WinRT toasts + activation / `quickadd.rs` window + hotkey
+- `window.rs` material, positioning, show/hide / `desktop.rs` z-order + Show-Desktop watcher + `suspend` / `theme.rs` accent / `tray.rs` tray menu
 
-**React** (`src/`): `app/Panel.tsx` shell, header menu, keyboard, draft card; `components/ItemRow.tsx` row + expand; `Editor.tsx` autosave editor;
-`MarkdownView.tsx`; `PlainGroup.tsx` reorder; `CompletedSection.tsx`; `Toast.tsx`; `lib/store.ts` zustand (all UI state, undo toast, check-then-complete);
-`lib/api.ts` typed invoke wrappers; `lib/time.ts`, `tags.ts`, `markdown.ts`, `motion.ts` (springs); `styles/tokens.css` design tokens.
+**React** (`src/`): `main.tsx` picks the app by window label (`quickadd` -> `app/QuickAdd.tsx`, else `app/Panel.tsx`); `components/ItemRow.tsx`, `Editor.tsx`, `MarkdownView.tsx`,
+`SnoozeMenu.tsx`, `PlainGroup.tsx`, `CompletedSection.tsx`, `Toast.tsx`; `lib/store.ts` zustand; `api.ts` invoke wrappers; `nlp.ts` quick-add parser; `time.ts`; `styles/tokens.css`.
 
 **API.** Commands: `list_items, create_item(edit), update_item(id,edit), delete_item, undelete_item(item), complete_item, restore_item, snooze_item(id,until),
-reorder(ids), get_settings, set_setting(key,value), export_json(path), import_json(path,mode), get_accent, get_autostart, set_autostart, hide_panel, quit`.
-Events: `items-changed` after every mutation, `settings-changed`, `accent-changed` (`#rrggbb`), `open-settings`. Items are camelCase JSON; times are unix ms UTC.
-Settings: only `autoclear_days` (default 7, 0 = keep). Completed items are purged lazily inside `list_items`.
+reorder(ids), get_settings, set_setting(key,value), export_json(path), import_json(path,mode), get_accent, get_autostart, set_autostart, hide_panel, hide_quickadd,
+set_quickadd_hotkey(hotkey), quit`. Events: `items-changed`, `settings-changed`, `accent-changed`, `open-settings`, `focus-item` ({id, snooze}), `quickadd-shown` (to the quickadd window).
+Items are camelCase JSON, times unix ms UTC. Settings: `autoclear_days` (7), `quickadd_hotkey` ("Ctrl+Alt+N"). M4 still needs UIs for both, "default snooze", theme.
 
 **Dev workflow**
-- New shells lack cargo: `$env:Path += ";$env:USERPROFILE\.cargo\bin"` (PowerShell) / `export PATH="$PATH:$HOME/.cargo/bin"` (bash).
-- Run: `pnpm tauri dev` (Rust and Vite hot-reload; touching any `src-tauri/src/*.rs` restarts the app). Test: `cargo test` (in `src-tauri`), `pnpm test` (vitest).
-  Lint: `cargo clippy --all-targets`, `pnpm tsc --noEmit`. All clean at the end of M2.
-- Drive the real webview: start dev with `$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9222"`, then
-  `node scripts/cdp.mjs eval "<js>"` / `shot out.png` / `key ArrowDown`. `scripts/seed.js` and `scripts/set.js` are paste-in helpers (seed data, set React inputs).
-  A CDP screenshot has no acrylic behind it (looks flat grey); the real window is translucent.
-- Win32 helpers: `winpos.ps1` (panel rect), `zorder.ps1 [-Top]`, `windtest.ps1` (synthetic Win+D with screenshots), `moveshot.ps1`.
-- Windows only: **no real Python** (`python3` is the Store stub and can hang). Script with Node or PowerShell. In bash, apostrophes inside heredocs
-  have broken tool calls; prefer the Write/Edit tools for files. Never broad-kill `node`/`cargo`; stop only the dev task you started.
-- The DB is `%APPDATA%\com.styky.app\styky.db`; the window state is `%APPDATA%\com.styky.app\.window-state.json`.
+- New shells lack cargo: `$env:Path += ";$env:USERPROFILE\.cargo\bin"` / bash `export PATH="$PATH:$HOME/.cargo/bin"`. Run `pnpm tauri dev` (touching `src-tauri/src/*.rs` restarts the app).
+  Test `cargo test` (in `src-tauri`), `pnpm test`; lint `cargo clippy --all-targets`, `pnpm tsc --noEmit`. All clean at the end of M3 (34 Rust, 17 vitest).
+- Drive the webview: start dev with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`. `scripts/cdp.mjs` (first page) or
+  `scripts/cdpx.mjs <label> "<js>"` (page of a given window label, e.g. `main`, `quickadd`; use `window.__TAURI_INTERNALS__.invoke` for commands).
+  `scripts/hotkey.ps1 ctrl+alt+n|enter|escape` synthesizes keys; `opennc.ps1` / `toastclick.ps1` poke the notification center. Win32: `winpos.ps1`, `zorder.ps1`, `windtest.ps1`.
+- Windows only: no real Python. Many repo files are CRLF, so scripted multi-line edits must normalise line endings. Apostrophes in bash heredocs / `node -e` break tool calls: use the Write/Edit tools. Never broad-kill `node`/`cargo`.
+- DB `%APPDATA%\com.styky.app\styky.db`; window state `.window-state.json` next to it. Test items you create in dev land in the real dev DB; delete them.
 
 **Gotchas**
-- **Z-order (`desktop.rs`)**: never use `HWND_BOTTOM`/`set_always_on_bottom` (hides the panel under Progman). The watcher thread (200 ms) makes the panel
-  `TOPMOST` while no ordinary app window is visible (Win+D) and drops it to just above Progman otherwise. Any new window of ours that is topmost
-  (quick-add, toast host, settings) must call `desktop::suspend(true)` while shown and `suspend(false)` when hidden, or the watcher will fight it
-  (`suspend` exists but is unused so far; it is marked `#[allow(dead_code)]`).
-- **Window state**: the plugin does not save when we `prevent_close`, so `lib.rs` saves explicitly on hide and (debounced) on move/resize.
-  `VISIBLE` and `DECORATIONS` are excluded from restore; first run (no state file) places the panel top-right.
-- **Material**: Acrylic first, Mica fallback (Mica goes flat when the window is inactive, which is nearly always for this widget).
-- `windows` crate 0.61: `BOOL` is `windows::core::BOOL`. Edition 2024 (let-chains are used).
-- Tauri permissions live in `src-tauri/capabilities/default.json`; the quick-add/settings windows will need their own capability entries.
+- **Z-order (`desktop.rs`)**: never `HWND_BOTTOM`/`set_always_on_bottom`. The 200 ms watcher makes the panel TOPMOST while no ordinary app window is visible. Any of our own topmost windows must call
+  `desktop::suspend(true/false)` (quick-add does; Settings must too).
+- **Toasts** are hand-built XML (see M3 notes); AUMID is `com.styky.app` in release builds only. Verify a toast from the *installed* build in M4.
+- **Window state**: the plugin does not save on `prevent_close`; `lib.rs` saves explicitly. `VISIBLE`/`DECORATIONS` are excluded from restore.
+- **Material**: Acrylic first, Mica fallback; `quickadd` uses the same `apply_material`. `windows` crate 0.61 (`BOOL` is `windows::core::BOOL`), edition 2024.
+- Tauri permissions are per window in `capabilities/` (`default.json` = main, `quickadd.json`); the Settings window needs its own entry.
+- Hotkey registration failure (key taken) only logs to stderr; the Settings recorder should surface the error from `set_quickadd_hotkey`.
 
-**Stubbed for later**
-- M3: scheduler (`last_fired_at` is stored but unused), toasts, snooze UI + `S` key, quick-add window + `Ctrl+Alt+N`, NL parser, `desktop::suspend` wiring.
-- M4: Settings window (header and tray `Settings...` are placeholders; tray emits `open-settings`), updater, installer, icon, motion polish, README.
-- Header `⋯` menu lacks nothing from the plan except Settings; `autoclear_days` has no UI yet.
+**Stubbed for M4**
+- Settings window (header and tray `Settings...` are placeholders; tray emits `open-settings`): theme, hotkey recorder, autostart, autoclear, default snooze, export/import, updater/about.
+- Updater, NSIS installer, app icon, motion polish, README (hotkeys + Win+D note). Pause state is not persisted and has no panel indicator.
