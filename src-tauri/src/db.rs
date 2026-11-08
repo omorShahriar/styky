@@ -7,7 +7,7 @@ use std::sync::{Mutex, MutexGuard};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use crate::model::{
-    ExportFile, ImportResult, Item, ItemEdit, PRIORITY_LOW, PRIORITY_URGENT, clean_opt,
+    ExportFile, ImportResult, Item, ItemEdit, PRIORITY_CRITICAL, PRIORITY_LOW, clean_opt,
     normalize_repeat,
 };
 use crate::license::Entitlement;
@@ -197,7 +197,7 @@ impl Db {
             body_md: edit.body_md.clone(),
             due_at: edit.due_at,
             repeat: normalize_repeat(&edit.repeat).to_string(),
-            priority: edit.priority.clamp(PRIORITY_LOW, PRIORITY_URGENT),
+            priority: edit.priority.clamp(PRIORITY_LOW, PRIORITY_CRITICAL),
             tag: clean_opt(&edit.tag),
             link: clean_opt(&edit.link),
             branch: clean_opt(&edit.branch),
@@ -230,7 +230,7 @@ impl Db {
         item.body_md = edit.body_md.clone();
         item.due_at = edit.due_at;
         item.repeat = normalize_repeat(&edit.repeat).to_string();
-        item.priority = edit.priority.clamp(PRIORITY_LOW, PRIORITY_URGENT);
+        item.priority = edit.priority.clamp(PRIORITY_LOW, PRIORITY_CRITICAL);
         item.tag = clean_opt(&edit.tag);
         item.link = clean_opt(&edit.link);
         item.branch = clean_opt(&edit.branch);

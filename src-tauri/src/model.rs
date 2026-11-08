@@ -5,6 +5,8 @@ use std::collections::BTreeMap;
 
 pub const PRIORITY_LOW: i64 = 0;
 pub const PRIORITY_URGENT: i64 = 2;
+/// Pro: critical items keep re-notifying (see `scheduler`).
+pub const PRIORITY_CRITICAL: i64 = 3;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

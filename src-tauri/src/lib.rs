@@ -1,20 +1,23 @@
-mod commands;
-mod db;
+pub mod api;
+pub mod commands;
+pub mod db;
 #[cfg(windows)]
-mod desktop;
-mod license;
-mod model;
-mod notify;
-mod quickadd;
-mod repeat;
-mod scheduler;
-mod settings_win;
-mod snooze;
-mod store;
-mod sort;
-mod theme;
-mod tray;
-mod window;
+pub mod desktop;
+pub mod license;
+pub mod model;
+pub mod nlp;
+pub mod proto;
+pub mod notify;
+pub mod quickadd;
+pub mod repeat;
+pub mod scheduler;
+pub mod settings_win;
+pub mod snooze;
+pub mod store;
+pub mod sort;
+pub mod theme;
+pub mod tray;
+pub mod window;
 
 use tauri::{Manager, WindowEvent};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -113,6 +116,7 @@ pub fn run() {
             quickadd::init(&handle);
             scheduler::spawn(handle.clone());
             spawn_license_check(handle.clone());
+            spawn_api(handle.clone());
             Ok(())
         })
         .on_window_event(|win, event| {
@@ -163,6 +167,28 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Styky");
+}
+
+/// Serve the local API on the per-user named pipe (see `api.rs`).
+fn spawn_api(app: tauri::AppHandle) {
+    #[cfg(windows)]
+    tauri::async_runtime::spawn(async move {
+        let handler_app = app.clone();
+        let handler: std::sync::Arc<dyn Fn(&str) -> String + Send + Sync> = std::sync::Arc::new(move |line| {
+            let db = handler_app.state::<db::Db>();
+            let ctx = api::Ctx { db: &db, now: commands::now_ms(), pro: license::is_pro() };
+            let (out, changed) = api::handle_line(&ctx, line);
+            if changed {
+                let _ = tauri::Emitter::emit(&handler_app, "items-changed", ());
+            }
+            out
+        });
+        if let Err(e) = api::serve(proto::pipe_name(), handler).await {
+            eprintln!("styky: local API is not available: {e}");
+        }
+    });
+    #[cfg(not(windows))]
+    let _ = app;
 }
 
 /// Load the cached entitlement, then re-check it (if due) at start and every 6 hours.

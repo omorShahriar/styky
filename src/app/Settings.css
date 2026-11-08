@@ -275,3 +275,43 @@ select option {
     box-shadow: 0 0 0 0.5px var(--hairline);
   }
 }
+
+/* Connect AI */
+.ai-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.ai-lede {
+  margin: 0;
+}
+.snippet {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.snippet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.snippet pre {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-btn);
+  background: var(--fill);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 17px;
+  overflow-x: auto;
+  user-select: text;
+}
+.snippet .small,
+.ai-tier {
+  margin: 0;
+}
+code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

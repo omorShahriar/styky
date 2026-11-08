@@ -1,0 +1,13 @@
+{
+  "bundle": {
+    "resources": {
+      "target/release/styky-cli.exe": "bin/styky.exe",
+      "installer/styky-path.ps1": "bin/styky-path.ps1"
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "installer/hooks.nsh"
+      }
+    }
+  }
+}

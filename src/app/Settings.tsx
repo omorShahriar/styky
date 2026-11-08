@@ -12,6 +12,7 @@ import { applyThemeMode, initTheme } from "../lib/theme";
 import { pressSpring } from "../lib/motion";
 import { keyToAccelerator, prettyHotkey } from "../lib/hotkey";
 import { ProCard } from "./ProCard";
+import { ConnectAI } from "./ConnectAI";
 import "./Settings.css";
 
 const THEMES = [
@@ -381,6 +382,8 @@ export default function Settings() {
             </select>
           </Row>
         </Group>
+
+        <ConnectAI />
 
         <Group title="Data" footer={note || "Exports are plain JSON. Replace overwrites everything."}>
           <Row label="Export">
