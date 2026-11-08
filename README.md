@@ -56,7 +56,7 @@ and run it.
 - It installs **per user**, with no admin prompt, and adds a Start menu entry.
 - Styky starts at login by default. You can change that in Settings.
 - Requires Windows 10 1809+ / Windows 11 (the WebView2 runtime is already part of Windows 11).
-- **Microsoft Store:** coming soon.
+- **Microsoft Store:** coming soon (see [docs/STORE.md](docs/STORE.md) for the packaging flow).
 
 > Windows SmartScreen may warn about an unrecognized app because the installer isn't Authenticode-signed yet. Click
 > **More info → Run anyway**. Updates are cryptographically signed and verified by the app itself.

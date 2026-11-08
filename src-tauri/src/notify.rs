@@ -50,7 +50,10 @@ pub fn parse_action(args: &str, selected: Option<&str>) -> Action {
 }
 
 fn aumid(app: &AppHandle) -> String {
-    if tauri::is_dev() {
+    if let Some(id) = crate::store::package_aumid() {
+        // MSIX: the package's own AUMID (PackageFamilyName!AppId) carries the Styky name and icon.
+        id
+    } else if tauri::is_dev() {
         POWERSHELL_AUMID.to_string()
     } else {
         // The NSIS installer stamps its shortcuts with the bundle identifier.

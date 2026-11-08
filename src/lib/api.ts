@@ -10,6 +10,8 @@ export const api = {
   quickaddHotkeyError: () => invoke<string | null>("quickadd_hotkey_error"),
   quit: () => invoke<void>("quit"),
   getAutostart: () => invoke<boolean>("get_autostart"),
+  autostartBlocked: () => invoke<boolean>("autostart_blocked"),
+  isStore: () => invoke<boolean>("is_store"),
   setAutostart: (enabled: boolean) => invoke<boolean>("set_autostart", { enabled }),
 
   // items

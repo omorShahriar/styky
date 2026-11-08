@@ -138,11 +138,29 @@ pub fn get_accent() -> String {
 
 #[tauri::command]
 pub fn get_autostart(app: AppHandle) -> bool {
+    if crate::store::is_packaged() {
+        return crate::store::startup_state() == Some(crate::store::Startup::Enabled);
+    }
     app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+/// Packaged only: launch at login was switched off in Task Manager / by policy and cannot be re-enabled from the app.
+#[tauri::command]
+pub fn autostart_blocked() -> bool {
+    crate::store::is_packaged() && crate::store::startup_state() == Some(crate::store::Startup::Blocked)
+}
+
+/// True for the Microsoft Store build (no self-updater).
+#[tauri::command]
+pub fn is_store() -> bool {
+    crate::store::is_store()
 }
 
 /// Enable/disable launch at login. Returns the resulting state.
 pub fn apply_autostart(app: &AppHandle, enabled: bool) -> bool {
+    if crate::store::is_packaged() {
+        return crate::store::set_startup(enabled) == Some(crate::store::Startup::Enabled);
+    }
     let launcher = app.autolaunch();
     let _ = if enabled { launcher.enable() } else { launcher.disable() };
     launcher.is_enabled().unwrap_or(false)

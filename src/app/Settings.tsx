@@ -179,15 +179,18 @@ type UpdateState =
 export default function Settings() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [autostart, setAutostart] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [store, setStore] = useState(false);
   const [hotkeyErr, setHotkeyErr] = useState<string | null>(null);
   const [version, setVersion] = useState("");
   const [note, setNote] = useState("");
   const [upd, setUpd] = useState<UpdateState>({ s: "idle" });
 
   const load = useCallback(async () => {
-    const [s, a, h] = await Promise.all([api.getSettings(), api.getAutostart(), api.quickaddHotkeyError()]);
+    const [s, a, h, b] = await Promise.all([api.getSettings(), api.getAutostart(), api.quickaddHotkeyError(), api.autostartBlocked()]);
     setSettings(s);
     setAutostart(a);
+    setBlocked(b);
     setHotkeyErr(h);
   }, []);
 
@@ -197,6 +200,7 @@ export default function Settings() {
     void initTheme().then((u) => (dead ? u() : (off = u)));
     void load();
     void getVersion().then(setVersion);
+    void api.isStore().then(setStore);
     const ev = listen("settings-changed", () => void load());
     // The autostart toggle can also change in the tray; refresh when we regain focus.
     const onFocus = () => void load();
@@ -333,8 +337,8 @@ export default function Settings() {
               onSaved={() => void load()}
             />
           </Row>
-          <Row label="Launch at login">
-            <Switch label="Launch at login" checked={autostart} onChange={async (v) => setAutostart(await api.setAutostart(v))} />
+          <Row label="Launch at login" hint={blocked ? "Turned off in Task Manager > Startup apps. Turn it back on there." : undefined}>
+            <Switch label="Launch at login" checked={autostart} onChange={async (v) => { setAutostart(await api.setAutostart(v)); setBlocked(await api.autostartBlocked()); }} />
           </Row>
         </Group>
 
@@ -385,11 +389,11 @@ export default function Settings() {
           </Row>
         </Group>
 
-        <Group title="About" footer={updText}>
+        <Group title="About" footer={store ? undefined : updText}>
           <Row label="Styky">
             <span className="muted tnum">Version {version}</span>
           </Row>
-          <Row label="Updates">
+          {!store && <Row label="Updates">
             {upd.s === "available" ? (
               <button className="btn primary" onClick={() => void install()}>
                 Install and restart
@@ -403,7 +407,7 @@ export default function Settings() {
                 Check for updates
               </button>
             )}
-          </Row>
+          </Row>}
         </Group>
       </div>
     </div>

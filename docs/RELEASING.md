@@ -4,6 +4,8 @@ Maintainer notes for cutting a release. Installed copies check
 `https://github.com/omorShahriar/styky/releases/latest/download/latest.json` for updates, and every update must be signed
 with the Styky updater key.
 
+> Microsoft Store (MSIX) builds are covered in [STORE.md](STORE.md).
+
 ## One-time setup
 
 - The updater **private key** lives at `%USERPROFILE%\.tauri\styky.key`, outside the repo. `*.key` is git-ignored.

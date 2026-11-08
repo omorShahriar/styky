@@ -195,3 +195,25 @@ Deviations / decisions:
 - **Launch at login defaults to ON** in release builds: first run with no `autostart_initialized` setting enables autostart and sets it to `1`
   (`first_run_autostart` in `lib.rs`); afterwards the user's choice is never overridden. Not applied in `tauri dev`. A replace-import that
   wipes settings would re-run this once.
+
+## Store (MSIX) notes
+
+- **Packaging**: `scripts/build-msix.ps1` (`pnpm tauri build --no-bundle`, stage `styky.exe` + generated tile assets + `resources.pri`, `makeappx pack`,
+  optional throwaway self-signed signature). Template: `packaging/msix/AppxManifest.xml` (`runFullTrust`, `windows.startupTask` id `StykyStartup`,
+  Enabled by default). Identity Name / Publisher / PublisherDisplayName are script parameters (placeholders `Styky.LocalTest` / `CN=StykyLocalTest`).
+  Output in `dist-msix/` (git-ignored, with `*.msix/*.pfx/*.cer`). The pfx is deleted right after signing and the key is removed from the cert store.
+- **Detection**: `store.rs` `is_packaged()` (`GetCurrentPackageFullName` != APPMODEL_ERROR_NO_PACKAGE). Cargo feature `store` only forces `is_store()`
+  (UI: hides updater) for unpackaged testing; identity-dependent code uses `is_packaged()`.
+- **Updater**: plugin is not registered when `is_store()`; Settings hides the Updates row (`is_store` command).
+- **Launch at login**: packaged builds use `StartupTask` (WinRT, awaited on a helper thread). `first_run_autostart` is skipped (manifest enables it).
+  `StartupTaskState::DisabledByUser/ByPolicy` => `autostart_blocked` command; Settings shows a hint to re-enable in Task Manager. Tray/Settings toggle go through
+  `commands::get/apply_autostart`.
+- **Toasts**: packaged AUMID = `GetCurrentApplicationUserModelId` (`PFN!Styky`), see `notify::aumid`.
+- **Data path (expected, not yet verified, see below)**: `%APPDATA%\com.styky.app` is redirected by MSIX file virtualization into
+  `%LOCALAPPDATA%\Packages\<PFN>\LocalCache\Roaming\com.styky.app`; it is deleted on uninstall and is separate from the NSIS install's DB. Export/Import use
+  user-chosen paths, which are not virtualized.
+- **Coexistence**: NSIS and MSIX builds share identifier `com.styky.app`, so the single-instance lock and the Ctrl+Alt+N hotkey collide if both run.
+- **BLOCKED on this machine**: installing the test package needs admin (trust the cert in `LocalMachine\TrustedPeople`; `CurrentUser\TrustedPeople` gives
+  0x800B0109) or Developer Mode (loose `-Register` gives 0x80073CFF). The session is not elevated and changing system trust/security settings was not
+  done unasked. Hence NOT verified under MSIX: panel/tray, toast under the Styky name and Done/Snooze activation, startup task state, data path,
+  hotkey, single-instance, z-order watcher, and WACK. Verified: package builds, `makeappx` accepts the manifest, signing works, tests/clippy/tsc clean.

@@ -5,7 +5,6 @@ use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
-use tauri_plugin_autostart::ManagerExt;
 
 use crate::window;
 
@@ -30,7 +29,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         "autostart",
         "Launch at login",
         true,
-        app.autolaunch().is_enabled().unwrap_or(false),
+        crate::commands::get_autostart(app.clone()),
         None::<&str>,
     )?;
     let sep = PredefinedMenuItem::separator(app)?;

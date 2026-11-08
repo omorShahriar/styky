@@ -9,6 +9,7 @@ mod repeat;
 mod scheduler;
 mod settings_win;
 mod snooze;
+mod store;
 mod sort;
 mod theme;
 mod tray;
@@ -26,7 +27,12 @@ static MOVE_SEQ: AtomicU64 = AtomicU64::new(0);
 pub fn run() {
     let flags = state_flags();
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    // The Store updates packaged installs itself; the self-updater is only for the NSIS/GitHub build.
+    if !store::is_store() {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+    builder
         // A second launch just brings the existing panel forward.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             window::show_panel(app);
@@ -44,12 +50,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_accent,
             commands::get_autostart,
             commands::set_autostart,
+            commands::autostart_blocked,
+            commands::is_store,
             commands::hide_panel,
             commands::quit,
             commands::quickadd_hotkey_error,
@@ -154,7 +161,8 @@ pub fn run() {
 
 /// Release builds turn "launch at login" on once, the first time they run; after that the user's choice wins.
 fn first_run_autostart(app: &tauri::AppHandle) {
-    if tauri::is_dev() {
+    // Packaged: the manifest startup task is already enabled by default; never override the user.
+    if tauri::is_dev() || store::is_packaged() {
         return;
     }
     let db = app.state::<db::Db>();
