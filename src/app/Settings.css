@@ -325,3 +325,17 @@ code {
   opacity: 0.5;
   pointer-events: none;
 }
+
+.swatch {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+input[type="range"] {
+  width: 120px;
+  accent-color: var(--accent);
+}

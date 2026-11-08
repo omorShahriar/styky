@@ -4,18 +4,11 @@ import { motion } from "motion/react";
 import { X } from "lucide-react";
 import { api } from "../lib/api";
 import { fromLocalInput, toLocalInput } from "../lib/time";
-import type { ItemEdit, Priority, Repeat } from "../lib/types";
+import type { ItemEdit, Priority } from "../lib/types";
 import { pressSpring } from "../lib/motion";
 import { usePro } from "../lib/pro";
 import { ProPill } from "./ProPill";
-
-const REPEATS: { value: Repeat; label: string }[] = [
-  { value: "none", label: "Never" },
-  { value: "daily", label: "Daily" },
-  { value: "weekdays", label: "Weekdays" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
-];
+import { RepeatField } from "./RepeatField";
 
 const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 0, label: "Low" },
@@ -193,23 +186,7 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
         </div>
       </div>
 
-      <div className="ed-field">
-        <span className="ed-label">Repeat</span>
-        <select
-          className="ed-input"
-          value={edit.repeat}
-          disabled={edit.dueAt == null}
-          title={edit.dueAt == null ? "Set a due time to repeat" : undefined}
-          onChange={(e) => patch({ repeat: e.target.value as Repeat })}
-          aria-label="Repeat"
-        >
-          {REPEATS.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <RepeatField value={edit.repeat} dueAt={edit.dueAt} onChange={(repeat) => patch({ repeat })} />
 
       <div className="ed-field">
         <span className="ed-label">

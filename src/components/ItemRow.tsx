@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react";
+import { describeRepeat } from "../lib/rrule";
 import { AlarmClock, Check, Copy, ExternalLink, GripVertical, Pencil, Repeat as RepeatIcon, Trash2 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -131,8 +132,8 @@ export function ItemRow({ item, reorderable, onDragEnd }: Props) {
   }
   if (item.repeat !== "none") {
     meta.push(
-      <span key="rep" className="meta-text" title={`Repeats ${item.repeat}`}>
-        <RepeatIcon size={12} strokeWidth={2} aria-label={`Repeats ${item.repeat}`} />
+      <span key="rep" className="meta-text" title={describeRepeat(item.repeat)}>
+        <RepeatIcon size={12} strokeWidth={2} aria-label={describeRepeat(item.repeat)} />
       </span>,
     );
   }

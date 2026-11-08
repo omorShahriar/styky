@@ -113,3 +113,31 @@
   color-scheme: light;
 }
 
+
+/*
+ * Pro: "Sticky" paper skin. Warm paper, dark ink, whatever the Windows theme is. The transparency slider
+ * reaches it through --paper-alpha (set by lib/proTheme.ts). html:root beats the dark-mode rules above.
+ */
+html:root[data-skin="sticky"] {
+  color-scheme: light;
+  --panel-tint: rgba(253, 243, 167, var(--paper-alpha, 0.94));
+  --panel-edge: rgba(120, 90, 10, 0.28);
+  --label: rgba(62, 46, 8, 0.9);
+  --label-2: rgba(62, 46, 8, 0.62);
+  --label-3: rgba(62, 46, 8, 0.36);
+  --hairline: rgba(120, 90, 10, 0.2);
+  --fill: rgba(120, 90, 10, 0.08);
+  --fill-hover: rgba(120, 90, 10, 0.13);
+  --fill-press: rgba(120, 90, 10, 0.19);
+  --menu-bg: rgba(255, 248, 200, 0.96);
+  --red: #b3261e;
+  --orange: #9a4a00;
+  --tag-l: 30%;
+  --tag-bg-a: 0.16;
+}
+html:root[data-skin="sticky"] .panel {
+  /* a hint of paper grain and a folded corner */
+  background-image:
+    linear-gradient(135deg, transparent calc(100% - 22px), rgba(120, 90, 10, 0.16) calc(100% - 22px), rgba(255, 255, 255, 0.5) 100%),
+    repeating-linear-gradient(0deg, transparent 0 27px, rgba(120, 90, 10, 0.05) 27px 28px);
+}

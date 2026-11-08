@@ -68,8 +68,11 @@ const SCHEMA_V4: &str = "ALTER TABLE items ADD COLUMN prealert_min INTEGER;
    ALTER TABLE items ADD COLUMN pre_fired_at INTEGER;
    ALTER TABLE items ADD COLUMN last_nag_at INTEGER;";
 
+/// The time of day a repeating series keeps (DST-gap safe).
+const SCHEMA_V5: &str = "ALTER TABLE items ADD COLUMN repeat_anchor_min INTEGER;";
+
 const COLS: &str = "id, title, body_md, due_at, repeat, priority, tag, link, branch, status, \
-                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day, \n                    prealert_min, pre_fired_at, last_nag_at";
+                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day, \n                    prealert_min, pre_fired_at, last_nag_at, repeat_anchor_min";
 
 fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
     Ok(Item {
@@ -93,13 +96,14 @@ fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
         prealert_min: r.get(17)?,
         pre_fired_at: r.get(18)?,
         last_nag_at: r.get(19)?,
+        repeat_anchor_min: r.get(20)?,
     })
 }
 
 fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
     conn.execute(
         &format!(
-            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)"
+            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)"
         ),
         params![
             i.id,
@@ -121,7 +125,8 @@ fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
             i.repeat_anchor_day,
             i.prealert_min,
             i.pre_fired_at,
-            i.last_nag_at
+            i.last_nag_at,
+            i.repeat_anchor_min
         ],
     )?;
     Ok(())
@@ -232,7 +237,7 @@ impl Db {
             title: edit.title.trim().to_string(),
             body_md: edit.body_md.clone(),
             due_at: edit.due_at,
-            repeat: normalize_repeat(&edit.repeat).to_string(),
+            repeat: normalize_repeat(&edit.repeat),
             priority: edit.priority.clamp(PRIORITY_LOW, PRIORITY_CRITICAL),
             tag: clean_opt(&edit.tag),
             link: clean_opt(&edit.link),
@@ -248,9 +253,11 @@ impl Db {
             prealert_min: normalize_prealert(edit.prealert_min),
             pre_fired_at: None,
             last_nag_at: None,
+            repeat_anchor_min: None,
         };
         let mut item = item;
         item.repeat_anchor_day = anchor_for(&item.repeat, item.due_at);
+        item.repeat_anchor_min = anchor_min_for(&item.repeat, item.due_at);
         upsert(&conn, &item).map_err(err)?;
         Ok(item)
     }
@@ -275,7 +282,7 @@ impl Db {
         item.title = edit.title.trim().to_string();
         item.body_md = edit.body_md.clone();
         item.due_at = edit.due_at;
-        item.repeat = normalize_repeat(&edit.repeat).to_string();
+        item.repeat = repeat.clone();
         item.priority = edit.priority.clamp(PRIORITY_LOW, PRIORITY_CRITICAL);
         item.tag = clean_opt(&edit.tag);
         item.link = clean_opt(&edit.link);
@@ -283,6 +290,9 @@ impl Db {
         item.updated_at = now;
         if re_anchor || item.repeat_anchor_day.is_none() {
             item.repeat_anchor_day = anchor_for(&item.repeat, item.due_at);
+        }
+        if re_anchor || (item.repeat_anchor_min.is_none() && item.repeat != "none") {
+            item.repeat_anchor_min = anchor_min_for(&item.repeat, item.due_at);
         }
         upsert(&conn, &item).map_err(err)?;
         Ok(item)
@@ -306,10 +316,17 @@ impl Db {
         let mut item = Self::get(&conn, id)?;
         let next = item
             .due_at
-            .and_then(|due| repeat::next_occurrence(due, &item.repeat, now, item.repeat_anchor_day.map(|d| d as u32)));
+            .and_then(|due| repeat::advance_full(
+                due,
+                &item.repeat,
+                now,
+                item.repeat_anchor_day.map(|d| d as u32),
+                item.repeat_anchor_min.map(|m| m as u32),
+            ));
         match next {
-            Some(next_due) => {
+            Some((next_due, rule)) => {
                 item.due_at = Some(next_due);
+                item.repeat = rule;
                 item.snoozed_until = None;
                 item.last_fired_at = None;
                 item.pre_fired_at = None;
@@ -502,9 +519,17 @@ impl Db {
     }
 }
 
+/// The time of day a repeating item keeps (minutes after local midnight).
+fn anchor_min_for(repeat: &str, due_at: Option<i64>) -> Option<i64> {
+    if repeat::normalize(repeat) == "none" {
+        return None;
+    }
+    due_at.and_then(repeat::local_minutes).map(i64::from)
+}
+
 /// The anchor day is only meaningful for monthly items that have a due date.
 fn anchor_for(repeat: &str, due_at: Option<i64>) -> Option<i64> {
-    if repeat != "monthly" {
+    if !repeat::uses_anchor(repeat) {
         return None;
     }
     due_at.and_then(repeat::local_day).map(i64::from)
@@ -529,6 +554,10 @@ fn migrate(conn: &Connection) -> Res<()> {
     }
     if version < 4 {
         conn.execute_batch(&format!("BEGIN; {SCHEMA_V4} PRAGMA user_version = 4; COMMIT;"))
+            .map_err(err)?;
+    }
+    if version < 5 {
+        conn.execute_batch(&format!("BEGIN; {SCHEMA_V5} PRAGMA user_version = 5; COMMIT;"))
             .map_err(err)?;
     }
     Ok(())
@@ -729,7 +758,7 @@ mod tests {
         assert_eq!((items[0].title.as_str(), items[0].prealert_min, items[0].last_nag_at), ("old", None, None));
         assert_eq!(db.license_get().unwrap(), None);
         let v: i64 = db.conn().pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
-        assert_eq!(v, 4);
+        assert_eq!(v, 5);
     }
 
     #[test]

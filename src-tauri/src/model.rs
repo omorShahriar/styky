@@ -39,6 +39,10 @@ pub struct Item {
     /// Pro: last time a Critical item re-notified.
     #[serde(default)]
     pub last_nag_at: Option<i64>,
+    /// Wall-clock time of day (minutes after local midnight) a repeating series keeps returning to, so a
+    /// reminder pushed forward by a DST gap goes back to its real time afterwards.
+    #[serde(default)]
+    pub repeat_anchor_min: Option<i64>,
 }
 
 impl Item {
@@ -83,14 +87,9 @@ pub struct ImportResult {
     pub skipped: usize,
 }
 
-pub fn normalize_repeat(r: &str) -> &'static str {
-    match r {
-        "daily" => "daily",
-        "weekdays" => "weekdays",
-        "weekly" => "weekly",
-        "monthly" => "monthly",
-        _ => "none",
-    }
+/// Legacy simple values pass through; Pro RRULE strings are canonicalised; anything else is "none".
+pub fn normalize_repeat(r: &str) -> String {
+    crate::repeat::normalize(r)
 }
 
 /// Pre-alert lengths the UI offers (minutes).
@@ -111,6 +110,12 @@ pub fn gate_edit(edit: &mut ItemEdit, existing: Option<&Item>, pro: bool) {
         edit.priority = PRIORITY_URGENT;
     }
     edit.prealert_min = existing.and_then(|i| i.prealert_min);
+    // Advanced repeats (intervals, chosen weekdays, nth weekday, COUNT/UNTIL) are Pro; the simple ones stay free.
+    let wanted = normalize_repeat(&edit.repeat);
+    if !crate::repeat::is_simple(&wanted) {
+        let keep = existing.map(|i| i.repeat.clone()).filter(|r| *r == wanted);
+        edit.repeat = keep.unwrap_or_else(|| existing.map_or_else(|| "none".to_string(), |i| i.repeat.clone()));
+    }
 }
 
 /// Trim and turn empty strings into `None`.
@@ -146,6 +151,7 @@ impl Item {
             prealert_min: None,
             pre_fired_at: None,
             last_nag_at: None,
+            repeat_anchor_min: None,
         }
     }
 }

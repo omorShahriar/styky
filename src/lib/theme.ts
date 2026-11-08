@@ -1,7 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { applyProTheme, hasAccentOverride } from "./proTheme";
 
 function applyAccent(hex: string) {
+  // A Pro accent override wins over the Windows accent.
+  if (hasAccentOverride()) return;
   document.documentElement.style.setProperty("--accent", hex);
 }
 
@@ -12,26 +15,47 @@ export function applyThemeMode(mode: string | undefined) {
   else delete el.dataset.theme;
 }
 
-async function loadThemeMode() {
+let windowsAccent = "";
+
+/** Read the saved settings (theme mode + Pro theme) and apply them. */
+async function refresh() {
   try {
-    const s = await invoke<Record<string, string>>("get_settings");
+    const [s, status] = await Promise.all([
+      invoke<Record<string, string>>("get_settings"),
+      invoke<{ pro: boolean }>("license_status"),
+    ]);
     applyThemeMode(s.theme);
+    applyProTheme(s, status.pro);
+    // Clearing an accent override must bring the Windows accent back.
+    if (!hasAccentOverride() && windowsAccent) document.documentElement.style.setProperty("--accent", windowsAccent);
   } catch {
     /* keep following the system */
   }
 }
 
-/** Read the Windows accent colour into --accent, apply the Theme setting, keep both live. */
+/** Read the Windows accent colour into --accent, apply the Theme settings, keep both live. */
 export async function initTheme(): Promise<() => void> {
   try {
-    applyAccent(await invoke<string>("get_accent"));
+    windowsAccent = await invoke<string>("get_accent");
+    applyAccent(windowsAccent);
   } catch {
     /* keep the CSS fallback */
   }
-  void loadThemeMode();
+  void refresh();
   const offs = await Promise.all([
-    listen<string>("accent-changed", (e) => applyAccent(e.payload)),
-    listen("settings-changed", () => void loadThemeMode()),
+    listen<string>("accent-changed", (e) => {
+      windowsAccent = e.payload;
+      applyAccent(e.payload);
+    }),
+    listen("settings-changed", () => void refresh()),
+    listen("pro-changed", () => void refresh()),
   ]);
-  return () => offs.forEach((u) => u());
+  // Light/dark can flip live; the default tint the opacity slider applies to depends on it.
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  const onScheme = () => void refresh();
+  mq.addEventListener("change", onScheme);
+  return () => {
+    offs.forEach((u) => u());
+    mq.removeEventListener("change", onScheme);
+  };
 }

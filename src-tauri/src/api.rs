@@ -108,7 +108,7 @@ fn add(ctx: &Ctx, p: &Value) -> Out {
         q.priority = parse_priority(v)?;
     }
     if let Some(v) = str_field(p, "repeat") {
-        q.repeat = parse_repeat(v)?;
+        q.repeat = parse_repeat(v, ctx.pro)?;
     }
     if q.title.trim().is_empty() {
         return Err(bad("a title is required (pass \"text\" or \"title\")"));
@@ -214,7 +214,7 @@ fn update(ctx: &Ctx, p: &Value) -> Out {
         e.priority = parse_priority(v)?;
     }
     if let Some(v) = str_field(p, "repeat") {
-        e.repeat = parse_repeat(v)?;
+        e.repeat = parse_repeat(v, ctx.pro)?;
     }
     if e.title.trim().is_empty() {
         return Err(bad("title cannot be empty"));
@@ -281,15 +281,27 @@ fn parse_prealert(v: &Value) -> Result<Option<i64>, ApiError> {
         .ok_or_else(|| bad("prealert must be one of 5m, 15m, 30m, 1h, 1d (or null)"))
 }
 
-fn parse_repeat(s: &str) -> Result<String, ApiError> {
-    match s.to_lowercase().as_str() {
-        "none" | "" => Ok("none".into()),
-        "daily" | "day" => Ok("daily".into()),
-        "weekdays" | "weekday" => Ok("weekdays".into()),
-        "weekly" | "week" => Ok("weekly".into()),
-        "monthly" | "month" => Ok("monthly".into()),
-        other => Err(bad(format!("repeat '{other}' is not one of none, daily, weekdays, weekly, monthly"))),
-    }
+fn parse_repeat(s: &str, pro: bool) -> Result<String, ApiError> {
+    let r = match s.to_lowercase().as_str() {
+        "" | "none" => "none".to_string(),
+        "daily" | "day" => "daily".into(),
+        "weekdays" | "weekday" => "weekdays".into(),
+        "weekly" | "week" => "weekly".into(),
+        "monthly" | "month" => "monthly".into(),
+        _ => {
+            let n = crate::repeat::normalize(s);
+            if n == "none" {
+                return Err(bad(format!(
+                    "repeat '{s}' is not none, daily, weekdays, weekly, monthly or an RRULE like FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=6"
+                )));
+            }
+            if !pro {
+                return Err(requires_pro("advanced repeats"));
+            }
+            n
+        }
+    };
+    Ok(r)
 }
 
 /// RFC 3339, `YYYY-MM-DD[ T]HH:MM` (local), a short duration (`30m`, `2h`, `3d`, `1w`) or natural language.

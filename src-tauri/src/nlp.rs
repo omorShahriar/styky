@@ -29,7 +29,7 @@ pub struct QuickParse {
     pub branch: Option<String>,
 }
 
-const DEFAULT_HOUR: u32 = 9;
+pub const DEFAULT_HOUR: u32 = 9;
 
 fn re(p: &str) -> Regex {
     Regex::new(p).expect("static regex")
@@ -53,22 +53,6 @@ fn take(s: &str, r: &Regex) -> (String, Option<Vec<String>>) {
     }
 }
 
-static EVERY: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)\bevery\s+(day|weekdays?|week|month)\b"));
-
-fn extract_repeat(s: &str) -> (String, Option<String>) {
-    let (rest, m) = take(s, &EVERY);
-    let rule = m.map(|c| {
-        match c[1].to_lowercase().as_str() {
-            "day" => "daily",
-            "week" => "weekly",
-            "month" => "monthly",
-            _ => "weekdays",
-        }
-        .to_string()
-    });
-    (rest, rule)
-}
-
 pub fn parse_quick(input: &str, now: DateTime<Local>) -> QuickParse {
     let mut text = format!(" {input} ");
     let mut link = None;
@@ -82,7 +66,7 @@ pub fn parse_quick(input: &str, now: DateTime<Local>) -> QuickParse {
     }
     text = rest;
 
-    let (rest, rule) = extract_repeat(&text);
+    let (rest, rule) = crate::nlp_repeat::extract(&text, now);
     text = rest;
     let mut repeat = rule.unwrap_or_else(|| "none".to_string());
 
@@ -128,7 +112,9 @@ pub fn parse_quick(input: &str, now: DateTime<Local>) -> QuickParse {
     }
     let title = clean(&title);
     if due_at.is_none() && repeat != "none" {
-        due_at = Some(next_default_time(now, repeat == "weekdays"));
+        // A rule that names its own days (every mon,wed / last friday of the month) starts on the first such day.
+        due_at = crate::repeat::first_match(&repeat, now.timestamp_millis(), DEFAULT_HOUR)
+            .or_else(|| Some(next_default_time(now, repeat == "weekdays")));
     }
     if repeat.is_empty() {
         repeat = "none".into();
@@ -317,6 +303,18 @@ fn find_day(text: &str, today: NaiveDate) -> Option<(Span, DatePart)> {
     None
 }
 
+/// A calendar date at the very start of `tail` (used by `until <date>`): the end of the date text and the date.
+pub fn leading_date(tail: &str, now: DateTime<Local>) -> Option<(usize, NaiveDate)> {
+    let (span, part) = find_day(tail, now.date_naive())?;
+    if !tail[..span.start].trim().is_empty() {
+        return None;
+    }
+    match part {
+        DatePart::Day(d) => Some((span.end, d)),
+        DatePart::Weekday(..) => None,
+    }
+}
+
 fn find_date(text: &str, now: DateTime<Local>) -> Option<Found> {
     let today = now.date_naive();
     let now_ms = now.timestamp_millis();
@@ -482,6 +480,24 @@ mod tests {
         // Friday evening-ish: weekday repeat skips the weekend.
         let fri = Local.with_ymd_and_hms(2026, 3, 13, 12, 0, 0).unwrap();
         assert_eq!(parse_quick("standup every weekday", fri).due_at, Some(ms(2026, 3, 16, 9, 0)));
+    }
+
+    #[test]
+    fn advanced_repeats_parse_and_start_on_the_right_day() {
+        // "every mon,wed" with no date starts on the next listed day at 09:00 (today is Wed 10:00 -> next Mon).
+        let q = p("gym every mon,wed");
+        assert_eq!((q.title.as_str(), q.repeat.as_str()), ("gym", "FREQ=WEEKLY;BYDAY=MO,WE"));
+        assert_eq!(q.due_at, Some(ms(2026, 3, 16, 9, 0)));
+        // "last friday of the month" -> Mar 27.
+        let q = p("send report last friday of the month");
+        assert_eq!((q.title.as_str(), q.repeat.as_str()), ("send report", "FREQ=MONTHLY;BYDAY=-1FR"));
+        assert_eq!(q.due_at, Some(ms(2026, 3, 27, 9, 0)));
+        // "every 2 weeks" without a date: next 09:00; with a date the date wins.
+        let q = p("sync every 2 weeks");
+        assert_eq!((q.repeat.as_str(), q.due_at), ("FREQ=WEEKLY;INTERVAL=2", Some(ms(2026, 3, 12, 9, 0))));
+        let q = p("sync every 2 weeks fri 3pm for 4 times");
+        assert_eq!((q.title.as_str(), q.repeat.as_str()), ("sync", "FREQ=WEEKLY;INTERVAL=2;COUNT=4"));
+        assert_eq!(q.due_at, Some(ms(2026, 3, 13, 15, 0)));
     }
 
     #[test]

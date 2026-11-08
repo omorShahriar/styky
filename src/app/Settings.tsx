@@ -15,6 +15,7 @@ import { ProCard } from "./ProCard";
 import { ConnectAI } from "./ConnectAI";
 import { ProPill } from "../components/ProPill";
 import { usePro } from "../lib/pro";
+import { readProTheme, THEME_KEYS } from "../lib/proTheme";
 import "./Settings.css";
 
 const THEMES = [
@@ -189,6 +190,7 @@ type UpdateState =
 
 export default function Settings() {
   const pro = usePro();
+  const [accentNow, setAccentNow] = useState("#0a84ff");
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [autostart, setAutostart] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -211,6 +213,7 @@ export default function Settings() {
     let dead = false;
     void initTheme().then((u) => (dead ? u() : (off = u)));
     void load();
+    void api.getAccent().then(setAccentNow).catch(() => {});
     void getVersion().then(setVersion);
     void api.isStore().then(setStore);
     const ev = listen("settings-changed", () => void load());
@@ -237,6 +240,8 @@ export default function Settings() {
       window.removeEventListener("keydown", onKey);
     };
   }, [load]);
+
+  const theme = readProTheme(settings);
 
   const set = async (key: string, value: string) => {
     setSettings((s) => ({ ...s, [key]: value }));
@@ -349,6 +354,117 @@ export default function Settings() {
               onChange={(v) => void set("theme", v)}
             />
           </Row>
+        </Group>
+
+        <Group
+          title="Panel look"
+          footer={
+            pro ? (
+              "Tint, transparency, density, accent and font size apply to the panel and quick-add bar."
+            ) : (
+              <>
+                Customise the panel with Styky Pro <ProPill />
+              </>
+            )
+          }
+        >
+          <Row label="Skin">
+            <span className={pro ? "" : "locked"}>
+              <Segmented
+                label="Skin"
+                value={theme.skin}
+                options={[
+                  { id: "none", label: "Glass" },
+                  { id: "sticky", label: "Sticky note" },
+                ]}
+                onChange={(v) => void set("theme_skin", v)}
+              />
+            </span>
+          </Row>
+          <Row label="Tint" hint={theme.skin === "sticky" ? "The Sticky note skin has its own colour" : undefined}>
+            <span className={`row-inline${pro && theme.skin !== "sticky" ? "" : " locked"}`}>
+              <input
+                type="color"
+                className="swatch"
+                aria-label="Panel tint"
+                value={theme.tint || "#ffffff"}
+                onChange={(e) => void set("theme_tint", e.target.value)}
+              />
+              {theme.tint && (
+                <button className="btn" onClick={() => void set("theme_tint", "")}>
+                  Reset
+                </button>
+              )}
+            </span>
+          </Row>
+          <Row label="Transparency" hint={theme.opacity === null ? "Default" : `${Math.round(theme.opacity * 100)}% opaque`}>
+            <span className={`row-inline${pro ? "" : " locked"}`}>
+              <input
+                type="range"
+                min={20}
+                max={100}
+                step={5}
+                aria-label="Panel opacity"
+                value={Math.round((theme.opacity ?? 0.55) * 100)}
+                onChange={(e) => void set("theme_opacity", String(Number(e.target.value) / 100))}
+              />
+              {theme.opacity !== null && (
+                <button className="btn" onClick={() => void set("theme_opacity", "")}>
+                  Reset
+                </button>
+              )}
+            </span>
+          </Row>
+          <Row label="Density">
+            <span className={pro ? "" : "locked"}>
+              <Segmented
+                label="Density"
+                value={theme.density}
+                options={[
+                  { id: "comfortable", label: "Comfortable" },
+                  { id: "compact", label: "Compact" },
+                ]}
+                onChange={(v) => void set("theme_density", v)}
+              />
+            </span>
+          </Row>
+          <Row label="Font size">
+            <span className={pro ? "" : "locked"}>
+              <Segmented
+                label="Font size"
+                value={theme.font}
+                options={[
+                  { id: "small", label: "Small" },
+                  { id: "medium", label: "Medium" },
+                  { id: "large", label: "Large" },
+                ]}
+                onChange={(v) => void set("theme_font", v)}
+              />
+            </span>
+          </Row>
+          <Row label="Accent colour" hint={theme.accent ? undefined : "Follows Windows"}>
+            <span className={`row-inline${pro ? "" : " locked"}`}>
+              <input
+                type="color"
+                className="swatch"
+                aria-label="Accent colour"
+                value={theme.accent || accentNow}
+                onChange={(e) => void set("theme_accent", e.target.value)}
+              />
+              {theme.accent && (
+                <button className="btn" onClick={() => void set("theme_accent", "")}>
+                  Use Windows accent
+                </button>
+              )}
+            </span>
+          </Row>
+          {pro && THEME_KEYS.some((k) => settings[k]) && (
+            <Row label="Reset look">
+              <button className="btn" onClick={() => void Promise.all(THEME_KEYS.map((k) => set(k, "")))}>
+                Reset all
+              </button>
+            </Row>
+          )}
         </Group>
 
         <Group title="General" footer="Press the hotkey anywhere in Windows to open the quick-add bar.">

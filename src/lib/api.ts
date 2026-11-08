@@ -19,6 +19,8 @@ export const api = {
   isStore: () => invoke<boolean>("is_store"),
   setAutostart: (enabled: boolean) => invoke<boolean>("set_autostart", { enabled }),
 
+  getAccent: () => invoke<string>("get_accent"),
+
   // items
   listItems: () => invoke<Item[]>("list_items"),
   createItem: (edit: ItemEdit) => invoke<Item>("create_item", { edit }),

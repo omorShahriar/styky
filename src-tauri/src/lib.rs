@@ -6,6 +6,7 @@ pub mod desktop;
 pub mod license;
 pub mod model;
 pub mod nlp;
+pub mod nlp_repeat;
 pub mod proto;
 pub mod notify;
 pub mod quickadd;

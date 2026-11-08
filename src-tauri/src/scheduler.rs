@@ -250,6 +250,7 @@ mod tests {
             prealert_min: None,
             pre_fired_at: None,
             last_nag_at: None,
+            repeat_anchor_min: None,
         }
     }
 
