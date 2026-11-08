@@ -170,6 +170,11 @@ pub fn set_quickadd_hotkey(app: AppHandle, hotkey: String) -> Res<()> {
 }
 
 #[tauri::command]
+pub fn open_settings(app: AppHandle) {
+    crate::settings_win::show(&app);
+}
+
+#[tauri::command]
 pub fn quit(app: AppHandle) {
     app.exit(0);
 }

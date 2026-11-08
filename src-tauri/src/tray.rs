@@ -1,7 +1,7 @@
 //! System tray: left-click toggles the panel; menu offers Show/Hide, Settings, Quit.
 
 use tauri::{
-    AppHandle, Emitter,
+    AppHandle,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
@@ -53,11 +53,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
                     None => PAUSE_LABEL.to_string(),
                 });
             }
-            "settings" => {
-                // Placeholder until the Settings window lands (M4).
-                window::show_panel(app);
-                let _ = app.emit("open-settings", ());
-            }
+            "settings" => crate::settings_win::show(app),
             "autostart" => {
                 let on = crate::commands::apply_autostart(app, autostart_item.is_checked().unwrap_or(false));
                 let _ = autostart_item.set_checked(on);

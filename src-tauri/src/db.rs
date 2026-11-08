@@ -19,8 +19,12 @@ fn err<E: std::fmt::Display>(e: E) -> String {
 }
 
 /// Default settings; stored values override them.
-pub const DEFAULT_SETTINGS: [(&str, &str); 2] =
-    [("autoclear_days", "7"), ("quickadd_hotkey", "Ctrl+Alt+N")];
+pub const DEFAULT_SETTINGS: [(&str, &str); 4] = [
+    ("autoclear_days", "7"),
+    ("quickadd_hotkey", "Ctrl+Alt+N"),
+    ("theme", "system"),
+    ("default_snooze", "10m"),
+];
 
 const SCHEMA_V1: &str = "
 CREATE TABLE items (

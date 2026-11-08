@@ -42,6 +42,22 @@
         "alwaysOnTop": true,
         "visible": false,
         "focus": true
+      },
+      {
+        "label": "settings",
+        "title": "Styky Settings",
+        "width": 480,
+        "height": 660,
+        "minWidth": 420,
+        "minHeight": 420,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "resizable": true,
+        "maximizable": false,
+        "minimizable": false,
+        "skipTaskbar": false,
+        "visible": false
       }
     ],
     "security": {
@@ -50,13 +66,32 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis"
+    ],
+    "createUpdaterArtifacts": true,
+    "publisher": "Styky",
+    "shortDescription": "Always-visible work reminders",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlENTRCNDJGNjY3MzE0MkEKUldRcUZITm1MN1JVblZCNTZvUVJRNnByUEtsRXprUi9OYkY3SHFJR2VaWlRaWVdtckFqMUlOL1MK",
+      "endpoints": [
+        "https://github.com/OWNER/REPO/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

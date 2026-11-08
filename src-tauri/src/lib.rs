@@ -7,6 +7,7 @@ mod notify;
 mod quickadd;
 mod repeat;
 mod scheduler;
+mod settings_win;
 mod snooze;
 mod sort;
 mod theme;
@@ -43,12 +44,15 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_accent,
             commands::get_autostart,
             commands::set_autostart,
             commands::hide_panel,
             commands::quit,
+            commands::open_settings,
             commands::list_items,
             commands::create_item,
             commands::update_item,
@@ -97,6 +101,14 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|win, event| {
+            if win.label() == settings_win::LABEL {
+                // Close = hide; the window is reused.
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = win.hide();
+                }
+                return;
+            }
             if win.label() == quickadd::LABEL {
                 // Blur hides the bar (Esc / Enter are handled in the page).
                 if let WindowEvent::Focused(false) = event {

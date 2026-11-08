@@ -93,7 +93,8 @@ fn item_lines(item: &Item, now: i64) -> (String, String) {
     (when, tag)
 }
 
-pub fn item_xml(item: &Item, now: i64) -> String {
+pub fn item_xml(item: &Item, now: i64, default_snooze: &str) -> String {
+    let default_snooze = if ["10m", "1h", "evening", "tomorrow"].contains(&default_snooze) { default_snooze } else { "10m" };
     let (line1, line2) = item_lines(item, now);
     let id = esc(&item.id);
     let line2 = if line2.is_empty() { String::new() } else { format!("<text>{}</text>", esc(&line2)) };
@@ -103,7 +104,7 @@ pub fn item_xml(item: &Item, now: i64) -> String {
     <text>{title}</text><text>{line1}</text>{line2}
   </binding></visual>
   <actions>
-    <input id="snooze" type="selection" defaultInput="10m">
+    <input id="snooze" type="selection" defaultInput="{default_snooze}">
       <selection id="10m" content="10 minutes"/>
       <selection id="1h" content="1 hour"/>
       <selection id="evening" content="This evening (18:00)"/>
@@ -116,6 +117,7 @@ pub fn item_xml(item: &Item, now: i64) -> String {
 </toast>"#,
         title = esc(&item.title),
         line1 = esc(&line1),
+        default_snooze = default_snooze,
     )
 }
 
@@ -160,9 +162,13 @@ fn show_xml(app: &AppHandle, xml: &str, tag: Option<&str>) -> windows::core::Res
     notifier.Show(&toast)
 }
 
+fn default_snooze(app: &AppHandle) -> String {
+    app.state::<Db>().settings().ok().and_then(|s| s.get("default_snooze").cloned()).unwrap_or_else(|| "10m".into())
+}
+
 /// Toast for one due item.
 pub fn show_item(app: &AppHandle, item: &Item) {
-    if let Err(e) = show_xml(app, &item_xml(item, now_ms()), Some(&item.id)) {
+    if let Err(e) = show_xml(app, &item_xml(item, now_ms(), &default_snooze(app)), Some(&item.id)) {
         eprintln!("styky: toast failed: {e}");
     }
 }
@@ -224,7 +230,8 @@ mod tests {
         item.title = "Fix <b>&\"x\"".into();
         item.tag = Some("api".into());
         item.due_at = Some(1_700_000_000_000);
-        let xml = item_xml(&item, 1_700_000_000_000);
+        let xml = item_xml(&item, 1_700_000_000_000, "1h");
+        assert!(xml.contains("defaultInput=\"1h\""));
         assert!(xml.contains("Fix &lt;b&gt;&amp;&quot;x&quot;"));
         assert!(xml.contains("#api"));
         assert!(xml.contains(&format!("snooze:{}", item.id)));
