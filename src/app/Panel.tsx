@@ -12,9 +12,11 @@ function Menu({ onClose }: { onClose: () => void }) {
     };
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("mousedown", down);
+    window.addEventListener("blur", onClose);
     window.addEventListener("keydown", key);
     return () => {
       window.removeEventListener("mousedown", down);
+      window.removeEventListener("blur", onClose);
       window.removeEventListener("keydown", key);
     };
   }, [onClose]);
