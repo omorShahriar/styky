@@ -1,6 +1,10 @@
 mod commands;
+mod db;
 #[cfg(windows)]
 mod desktop;
+mod model;
+mod repeat;
+mod sort;
 mod theme;
 mod tray;
 mod window;
@@ -32,15 +36,32 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_accent,
             commands::get_autostart,
             commands::set_autostart,
             commands::hide_panel,
             commands::quit,
+            commands::list_items,
+            commands::create_item,
+            commands::update_item,
+            commands::delete_item,
+            commands::undelete_item,
+            commands::complete_item,
+            commands::restore_item,
+            commands::snooze_item,
+            commands::reorder,
+            commands::get_settings,
+            commands::set_setting,
+            commands::export_json,
+            commands::import_json,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
+            let db_path = app.path().app_data_dir()?.join("styky.db");
+            app.manage(db::Db::open(&db_path).map_err(|e| format!("cannot open {db_path:?}: {e}"))?);
             let win = app
                 .get_webview_window(window::MAIN)
                 .expect("main window is declared in tauri.conf.json");
