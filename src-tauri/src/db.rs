@@ -7,9 +7,10 @@ use std::sync::{Mutex, MutexGuard};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use crate::model::{
-    ExportFile, ImportResult, Item, ItemEdit, PRIORITY_LOW, PRIORITY_URGENT, clean_opt,
-    normalize_repeat,
+    ExportFile, ImportResult, Item, ItemEdit, PRIORITY_CRITICAL, PRIORITY_LOW, clean_opt,
+    normalize_prealert, normalize_repeat,
 };
+use crate::license::Entitlement;
 use crate::{repeat, sort};
 
 pub type Res<T> = Result<T, String>;
@@ -19,11 +20,14 @@ fn err<E: std::fmt::Display>(e: E) -> String {
 }
 
 /// Default settings; stored values override them.
-pub const DEFAULT_SETTINGS: [(&str, &str); 4] = [
+pub const DEFAULT_SETTINGS: [(&str, &str); 6] = [
     ("autoclear_days", "7"),
     ("quickadd_hotkey", "Ctrl+Alt+N"),
     ("theme", "system"),
     ("default_snooze", "10m"),
+    // Pro: minutes between Critical re-notifications, and whether a re-notification raises the panel.
+    ("escalation_minutes", "10"),
+    ("escalation_bring_forward", "0"),
 ];
 
 const SCHEMA_V1: &str = "
@@ -50,8 +54,25 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 const SCHEMA_V2: &str = "ALTER TABLE items ADD COLUMN repeat_anchor_day INTEGER;";
 
+/// Pro license cache (kept out of `settings` so exports never carry the key).
+const SCHEMA_V3: &str = "CREATE TABLE license (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  key TEXT NOT NULL,
+  instance_id TEXT NOT NULL,
+  validated_at INTEGER NOT NULL,
+  customer TEXT
+);";
+
+/// Pre-alerts and Critical escalation (Pro).
+const SCHEMA_V4: &str = "ALTER TABLE items ADD COLUMN prealert_min INTEGER;
+   ALTER TABLE items ADD COLUMN pre_fired_at INTEGER;
+   ALTER TABLE items ADD COLUMN last_nag_at INTEGER;";
+
+/// The time of day a repeating series keeps (DST-gap safe).
+const SCHEMA_V5: &str = "ALTER TABLE items ADD COLUMN repeat_anchor_min INTEGER;";
+
 const COLS: &str = "id, title, body_md, due_at, repeat, priority, tag, link, branch, status, \
-                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day";
+                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day, \n                    prealert_min, pre_fired_at, last_nag_at, repeat_anchor_min";
 
 fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
     Ok(Item {
@@ -72,13 +93,17 @@ fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
         created_at: r.get(14)?,
         updated_at: r.get(15)?,
         repeat_anchor_day: r.get(16)?,
+        prealert_min: r.get(17)?,
+        pre_fired_at: r.get(18)?,
+        last_nag_at: r.get(19)?,
+        repeat_anchor_min: r.get(20)?,
     })
 }
 
 fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
     conn.execute(
         &format!(
-            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)"
+            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)"
         ),
         params![
             i.id,
@@ -97,7 +122,11 @@ fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
             i.sort_order,
             i.created_at,
             i.updated_at,
-            i.repeat_anchor_day
+            i.repeat_anchor_day,
+            i.prealert_min,
+            i.pre_fired_at,
+            i.last_nag_at,
+            i.repeat_anchor_min
         ],
     )?;
     Ok(())
@@ -139,6 +168,10 @@ impl Db {
         .ok_or_else(|| format!("item {id} not found"))
     }
 
+    pub fn get_item(&self, id: &str) -> Res<Item> {
+        Self::get(&self.conn(), id)
+    }
+
     /// All items in display order (open first, then completed).
     pub fn list(&self, now: i64) -> Res<Vec<Item>> {
         let conn = self.conn();
@@ -166,6 +199,24 @@ impl Db {
             .map_err(err)
     }
 
+    /// Record that these items' pre-alert fired.
+    pub fn mark_pre_fired(&self, ids: &[String], now: i64) -> Res<()> {
+        let conn = self.conn();
+        for id in ids {
+            conn.execute("UPDATE items SET pre_fired_at = ?1 WHERE id = ?2", params![now, id]).map_err(err)?;
+        }
+        Ok(())
+    }
+
+    /// Record that these Critical items re-notified.
+    pub fn mark_nagged(&self, ids: &[String], now: i64) -> Res<()> {
+        let conn = self.conn();
+        for id in ids {
+            conn.execute("UPDATE items SET last_nag_at = ?1 WHERE id = ?2", params![now, id]).map_err(err)?;
+        }
+        Ok(())
+    }
+
     /// Record that these items have fired (does not touch `updated_at`).
     pub fn mark_fired(&self, ids: &[String], now: i64) -> Res<()> {
         let conn = self.conn();
@@ -186,8 +237,8 @@ impl Db {
             title: edit.title.trim().to_string(),
             body_md: edit.body_md.clone(),
             due_at: edit.due_at,
-            repeat: normalize_repeat(&edit.repeat).to_string(),
-            priority: edit.priority.clamp(PRIORITY_LOW, PRIORITY_URGENT),
+            repeat: normalize_repeat(&edit.repeat),
+            priority: edit.priority.clamp(PRIORITY_LOW, PRIORITY_CRITICAL),
             tag: clean_opt(&edit.tag),
             link: clean_opt(&edit.link),
             branch: clean_opt(&edit.branch),
@@ -199,9 +250,14 @@ impl Db {
             created_at: now,
             updated_at: now,
             repeat_anchor_day: None,
+            prealert_min: normalize_prealert(edit.prealert_min),
+            pre_fired_at: None,
+            last_nag_at: None,
+            repeat_anchor_min: None,
         };
         let mut item = item;
         item.repeat_anchor_day = anchor_for(&item.repeat, item.due_at);
+        item.repeat_anchor_min = anchor_min_for(&item.repeat, item.due_at);
         upsert(&conn, &item).map_err(err)?;
         Ok(item)
     }
@@ -215,18 +271,28 @@ impl Db {
             // A new due time re-arms the reminder.
             item.snoozed_until = None;
             item.last_fired_at = None;
+            item.pre_fired_at = None;
+            item.last_nag_at = None;
+        }
+        let prealert = normalize_prealert(edit.prealert_min);
+        if item.prealert_min != prealert {
+            item.pre_fired_at = None;
+            item.prealert_min = prealert;
         }
         item.title = edit.title.trim().to_string();
         item.body_md = edit.body_md.clone();
         item.due_at = edit.due_at;
-        item.repeat = normalize_repeat(&edit.repeat).to_string();
-        item.priority = edit.priority.clamp(PRIORITY_LOW, PRIORITY_URGENT);
+        item.repeat = repeat.clone();
+        item.priority = edit.priority.clamp(PRIORITY_LOW, PRIORITY_CRITICAL);
         item.tag = clean_opt(&edit.tag);
         item.link = clean_opt(&edit.link);
         item.branch = clean_opt(&edit.branch);
         item.updated_at = now;
         if re_anchor || item.repeat_anchor_day.is_none() {
             item.repeat_anchor_day = anchor_for(&item.repeat, item.due_at);
+        }
+        if re_anchor || (item.repeat_anchor_min.is_none() && item.repeat != "none") {
+            item.repeat_anchor_min = anchor_min_for(&item.repeat, item.due_at);
         }
         upsert(&conn, &item).map_err(err)?;
         Ok(item)
@@ -250,12 +316,21 @@ impl Db {
         let mut item = Self::get(&conn, id)?;
         let next = item
             .due_at
-            .and_then(|due| repeat::next_occurrence(due, &item.repeat, now, item.repeat_anchor_day.map(|d| d as u32)));
+            .and_then(|due| repeat::advance_full(
+                due,
+                &item.repeat,
+                now,
+                item.repeat_anchor_day.map(|d| d as u32),
+                item.repeat_anchor_min.map(|m| m as u32),
+            ));
         match next {
-            Some(next_due) => {
+            Some((next_due, rule)) => {
                 item.due_at = Some(next_due);
+                item.repeat = rule;
                 item.snoozed_until = None;
                 item.last_fired_at = None;
+                item.pre_fired_at = None;
+                item.last_nag_at = None;
             }
             None => {
                 item.status = "done".into();
@@ -282,6 +357,7 @@ impl Db {
         let mut item = Self::get(&conn, id)?;
         item.snoozed_until = Some(until);
         item.last_fired_at = None;
+        item.last_nag_at = None;
         item.updated_at = now;
         upsert(&conn, &item).map_err(err)?;
         Ok(item)
@@ -312,6 +388,70 @@ impl Db {
                 .map_err(err)?;
         }
         tx.commit().map_err(err)
+    }
+
+    pub fn license_get(&self) -> Res<Option<Entitlement>> {
+        self.conn()
+            .query_row(
+                "SELECT key, instance_id, validated_at, customer FROM license WHERE id = 1",
+                [],
+                |r| {
+                    Ok(Entitlement {
+                        key: r.get(0)?,
+                        instance_id: r.get(1)?,
+                        validated_at: r.get(2)?,
+                        customer: r.get(3)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(err)
+    }
+
+    pub fn license_set(&self, e: &Entitlement) -> Res<()> {
+        self.conn()
+            .execute(
+                "INSERT OR REPLACE INTO license (id, key, instance_id, validated_at, customer) VALUES (1, ?1, ?2, ?3, ?4)",
+                params![e.key, e.instance_id, e.validated_at, e.customer],
+            )
+            .map_err(err)?;
+        Ok(())
+    }
+
+    /// Update validated_at/customer only if the cached entitlement is still this key + instance.
+    pub fn license_renew(&self, key: &str, instance_id: &str, now: i64, customer: Option<&str>) -> Res<bool> {
+        let n = self
+            .conn()
+            .execute(
+                "UPDATE license SET validated_at = ?1, customer = ?2 WHERE id = 1 AND key = ?3 AND instance_id = ?4",
+                params![now, customer, key, instance_id],
+            )
+            .map_err(err)?;
+        Ok(n > 0)
+    }
+
+    /// Delete the cached entitlement only if it is still this key + instance.
+    pub fn license_clear_if(&self, key: &str, instance_id: &str) -> Res<bool> {
+        let n = self
+            .conn()
+            .execute("DELETE FROM license WHERE id = 1 AND key = ?1 AND instance_id = ?2", params![key, instance_id])
+            .map_err(err)?;
+        Ok(n > 0)
+    }
+
+    /// A random id for this install (used in the licence instance name instead of the PC name).
+    pub fn install_id(&self) -> String {
+        if let Some(id) = self.settings().ok().and_then(|s| s.get("install_id").cloned()) {
+            return id;
+        }
+        let id = uuid::Uuid::new_v4().simple().to_string()[..8].to_string();
+        let _ = self.set_setting("install_id", &id);
+        id
+    }
+
+    pub fn license_clear(&self) -> Res<()> {
+        self.conn().execute("DELETE FROM license", []).map_err(err)?;
+        Ok(())
     }
 
     pub fn settings(&self) -> Res<BTreeMap<String, String>> {
@@ -362,7 +502,11 @@ impl Db {
             version: 1,
             exported_at: now,
             items,
-            settings: self.settings()?,
+            settings: {
+                let mut s = self.settings()?;
+                s.remove("install_id");
+                s
+            },
         })
     }
 
@@ -410,9 +554,17 @@ impl Db {
     }
 }
 
+/// The time of day a repeating item keeps (minutes after local midnight).
+fn anchor_min_for(repeat: &str, due_at: Option<i64>) -> Option<i64> {
+    if repeat::normalize(repeat) == "none" {
+        return None;
+    }
+    due_at.and_then(repeat::local_minutes).map(i64::from)
+}
+
 /// The anchor day is only meaningful for monthly items that have a due date.
 fn anchor_for(repeat: &str, due_at: Option<i64>) -> Option<i64> {
-    if repeat != "monthly" {
+    if !repeat::uses_anchor(repeat) {
         return None;
     }
     due_at.and_then(repeat::local_day).map(i64::from)
@@ -429,6 +581,18 @@ fn migrate(conn: &Connection) -> Res<()> {
     }
     if version < 2 {
         conn.execute_batch(&format!("BEGIN; {SCHEMA_V2} PRAGMA user_version = 2; COMMIT;"))
+            .map_err(err)?;
+    }
+    if version < 3 {
+        conn.execute_batch(&format!("BEGIN; {SCHEMA_V3} PRAGMA user_version = 3; COMMIT;"))
+            .map_err(err)?;
+    }
+    if version < 4 {
+        conn.execute_batch(&format!("BEGIN; {SCHEMA_V4} PRAGMA user_version = 4; COMMIT;"))
+            .map_err(err)?;
+    }
+    if version < 5 {
+        conn.execute_batch(&format!("BEGIN; {SCHEMA_V5} PRAGMA user_version = 5; COMMIT;"))
             .map_err(err)?;
     }
     Ok(())
@@ -613,5 +777,81 @@ mod tests {
         conn.execute("INSERT INTO items (id,title,sort_order,created_at,updated_at) VALUES ('a', 't', 1, 1, 1)", []).unwrap();
         let db = Db::init(conn).unwrap();
         assert_eq!(db.list(0).unwrap()[0].repeat_anchor_day, None);
+    }
+
+    #[test]
+    fn migrates_a_v2_database_to_the_current_schema_keeping_items() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(&format!("{SCHEMA_V1} {SCHEMA_V2} PRAGMA user_version = 2;")).unwrap();
+        conn.execute(
+            "INSERT INTO items (id, title, sort_order, created_at, updated_at, due_at) VALUES ('a', 'old', 1, 1, 1, 5000)",
+            [],
+        )
+        .unwrap();
+        let db = Db::init(conn).unwrap();
+        let items = db.list(0).unwrap();
+        assert_eq!((items[0].title.as_str(), items[0].prealert_min, items[0].last_nag_at), ("old", None, None));
+        assert_eq!(db.license_get().unwrap(), None);
+        let v: i64 = db.conn().pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
+        assert_eq!(v, 5);
+    }
+
+    #[test]
+    fn prealert_and_nag_markers_re_arm_with_the_item() {
+        let db = Db::open_memory().unwrap();
+        let mut e = edit("x");
+        e.due_at = Some(100_000);
+        e.prealert_min = Some(15);
+        e.priority = 3;
+        let it = db.create(&e, 1).unwrap();
+        assert_eq!((it.prealert_min, it.priority), (Some(15), 3));
+        // Unsupported lengths are dropped.
+        let mut bad = edit("y");
+        bad.prealert_min = Some(7);
+        assert_eq!(db.create(&bad, 1).unwrap().prealert_min, None);
+
+        db.mark_pre_fired(std::slice::from_ref(&it.id), 50).unwrap();
+        db.mark_nagged(std::slice::from_ref(&it.id), 60).unwrap();
+        let got = &db.list(0).unwrap().into_iter().find(|i| i.id == it.id).unwrap();
+        assert_eq!((got.pre_fired_at, got.last_nag_at), (Some(50), Some(60)));
+        // Snooze keeps pre_fired but clears the nag clock.
+        let s = db.snooze(&it.id, 90_000, 2).unwrap();
+        assert_eq!((s.pre_fired_at, s.last_nag_at), (Some(50), None));
+        // Changing the pre-alert length re-arms it; changing the due time re-arms everything.
+        e.prealert_min = Some(30);
+        assert_eq!(db.update(&it.id, &e, 3).unwrap().pre_fired_at, None);
+        db.mark_pre_fired(std::slice::from_ref(&it.id), 70).unwrap();
+        e.due_at = Some(500_000);
+        let u = db.update(&it.id, &e, 4).unwrap();
+        assert_eq!((u.pre_fired_at, u.last_nag_at, u.last_fired_at), (None, None, None));
+        // Completing a repeating item re-arms for the next occurrence.
+        e.repeat = "daily".into();
+        db.update(&it.id, &e, 5).unwrap();
+        db.mark_pre_fired(std::slice::from_ref(&it.id), 80).unwrap();
+        let c = db.complete(&it.id, 6).unwrap();
+        assert_eq!(c.pre_fired_at, None);
+    }
+
+    #[test]
+    fn gate_edit_keeps_pro_fields_out_of_free_builds() {
+        use crate::model::gate_edit;
+        let mut e = edit("x");
+        e.priority = 3;
+        e.prealert_min = Some(15);
+        gate_edit(&mut e, None, false);
+        assert_eq!((e.priority, e.prealert_min), (2, None));
+        // An item that is already critical / has a pre-alert keeps them through unrelated edits.
+        let mut existing = Item::blank("i");
+        existing.priority = 3;
+        existing.prealert_min = Some(30);
+        let mut e = edit("x");
+        e.priority = 3;
+        e.prealert_min = Some(5);
+        gate_edit(&mut e, Some(&existing), false);
+        assert_eq!((e.priority, e.prealert_min), (3, Some(30)));
+        let mut e = edit("x");
+        e.priority = 3;
+        gate_edit(&mut e, None, true);
+        assert_eq!(e.priority, 3);
     }
 }

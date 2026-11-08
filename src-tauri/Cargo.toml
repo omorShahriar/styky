@@ -6,6 +6,16 @@ authors = ["Omor Shahriar"]
 license = "MIT"
 repository = "https://github.com/omorShahriar/styky"
 edition = "2024"
+default-run = "styky"
+
+[[bin]]
+name = "styky"
+path = "src/main.rs"
+
+# The command-line client; the installer ships it as `styky.exe` in a `bin` folder on the user PATH.
+[[bin]]
+name = "styky-cli"
+path = "src/cli/main.rs"
 
 [lib]
 # The `_lib` suffix is needed to keep the lib name unique from the bin name on Windows.
@@ -34,16 +44,23 @@ uuid = { version = "1.29.1", features = ["v4"] }
 tauri-plugin-dialog = "2.8.4"
 tauri-plugin-clipboard-manager = "2.5.0"
 tauri-plugin-global-shortcut = "2.4.1"
-tokio = { version = "1.54.1", features = ["sync", "time"] }
+tokio = { version = "1.54.1", features = ["sync", "time", "net", "io-util", "rt"] }
 tauri-plugin-updater = "2.14.1"
 tauri-plugin-process = "2.4.0"
+ureq = "3"
+regex = "1"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["UI", "UI_ViewManagement", "Foundation", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Dwm", "UI_Notifications", "Data_Xml_Dom", "Foundation_Collections", "ApplicationModel", "Win32_Storage_Packaging_Appx"] }
+windows = { version = "0.61", features = ["UI", "UI_ViewManagement", "Foundation", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Dwm", "UI_Notifications", "Data_Xml_Dom", "Foundation_Collections", "ApplicationModel", "Win32_Storage_Packaging_Appx", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_System_Pipes"] }
+
+[dev-dependencies]
+chrono-tz = "0.10"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [profile.release]
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
+# unwind (not abort): the API handler runs on arbitrary CLI/MCP text and catches a panic per request instead of killing the app.
+panic = "unwind"
 strip = true

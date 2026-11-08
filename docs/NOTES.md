@@ -217,3 +217,69 @@ Deviations / decisions:
   0x800B0109) or Developer Mode (loose `-Register` gives 0x80073CFF). The session is not elevated and changing system trust/security settings was not
   done unasked. Hence NOT verified under MSIX: panel/tray, toast under the Styky name and Done/Snooze activation, startup task state, data path,
   hotkey, single-instance, z-order watcher, and WACK. Verified: package builds, `makeappx` accepts the manifest, signing works, tests/clippy/tsc clean.
+
+## Pro v1 notes
+
+Spec and final decisions: `docs/PRO.md`. Everything Pro is in the public repo behind `license::is_pro()` (honor system).
+
+**Schema.** `user_version` is now 5. v3 = `license` table (key, instance_id, validated_at, customer; kept out of `settings` so exports never carry
+the key); v4 = `items.prealert_min / pre_fired_at / last_nag_at`; v5 = `items.repeat_anchor_min` (time of day a series keeps, so a DST gap does not
+drift it). The brief said "migration v3" for escalation; the licence table landed first, so escalation is v4. `items.repeat` itself needed no
+migration: it holds the legacy value or an RRULE string (`FREQ=…;INTERVAL=…;BYDAY=…;BYMONTHDAY=…;COUNT=…;UNTIL=…`).
+
+**P1 licensing** (`license.rs`, `commands.rs`, `ProCard.tsx`, `ProPill.tsx`, `lib/pro.ts`)
+- Lemon Squeezy License API over `ureq` (blocking, 15 s timeout, `http_status_as_error(false)`), behind the `Http` trait; tests use a scripted mock.
+- `STYKY_BUY_URL`, `LEMON_STORE_ID`, `LEMON_PRODUCT_ID` are constants at the top of `license.rs`. Both ids `0` = unconfigured = no product check.
+- `PRO` is an `AtomicBool` refreshed from the DB at start, after activate/remove and by a 6-hour background thread; `pro-changed` is emitted on change.
+- Free builds cannot *set* Pro fields (`model::gate_edit`: Critical -> Urgent, pre-alert kept, custom repeat kept); values an item already has survive
+  unrelated edits, and a lapsed Pro keeps working repeats (only creating/changing is gated). Themes apply nothing without Pro.
+
+**P2 API / CLI / MCP** (`api.rs`, `proto.rs`, `nlp.rs`, `nlp_repeat.rs`, `cli/`)
+- Pipe `\\.\pipe\styky-<USERNAME>`; DACL `D:P(A;;GA;;;<current user SID>)` (no SYSTEM/Administrators), `reject_remote_clients`, `first_pipe_instance(true)`.
+  `proto.rs` is `#[path]`-included by the CLI so both sides share the name and client.
+- The CLI is a second `[[bin]]` (`styky-cli`) in the same package (so `CARGO_BIN_EXE_styky-cli` works in `tests/cli.rs`), console subsystem, no tauri code linked.
+- **Installer.** `bundle.resources` cannot point at a file that does not exist (tauri-build checks even for `cargo test`/dev), so the CLI + PATH script
+  are added by `src-tauri/tauri.bundle.conf.json`, merged by `scripts/build.ps1` (`cargo build --release --bin styky-cli` first, then `pnpm tauri build --config …`).
+  A plain `pnpm tauri build` ships no CLI. NSIS hooks (`installer/hooks.nsh`) call `installer/styky-path.ps1` (registry API, keeps REG_EXPAND_SZ, idempotent, no
+  1024-char NSIS string limit) after install and before uninstall.
+- MCP is hand-rolled (see PRO.md). Protocol versions 2025-11-25 / 2025-06-18 / 2025-03-26 / 2024-11-05 are accepted.
+- The Rust NL parser covers the token grammar plus common date phrases (see the header of `nlp.rs`); it is not chrono-node. Known gaps vs the bar: ranges,
+  "next month", month names without a day, 12-hour times without minutes before a date word in odd orders, other languages.
+
+**P3 escalation** (`scheduler.rs::plan`): three independent "already fired" markers (`last_fired_at`, `pre_fired_at`, `last_nag_at`), each written *before* the toast.
+Pre-alert: Pro, due in the future, not snoozed, once per (due time, length); a pre-alert whose window was missed is dropped. Nag: Pro, priority 3, open, main toast
+already fired, `max(last_fired_at, last_nag_at) + N min`; snooze clears the nag clock; repeating completion re-arms everything. The nag toast reuses the due toast's
+tag so it replaces instead of stacking. Settings: `escalation_minutes` (default 10), `escalation_bring_forward`.
+
+**P4 repeats** (`repeat.rs`): every occurrence is computed from the series start (not chained), so month ends do not drift; COUNT counts down *remaining incl. current*
+(the stored rule is rewritten on each completion, skipped/overdue occurrences do not use it up); UNTIL is an inclusive local date. DST: `advance_in<Tz>` is generic so the
+tests run in America/New_York (`chrono-tz` dev-dependency): gap (02:30 on 2026-03-08 -> 03:30 once, then back via `repeat_anchor_min`), overlap (01:30 on 2026-11-01 resolves to the
+first instance, 25 h later next day), weekly/nth-weekday/month-end across both transitions. The machine's own zone has no DST, so only these tests exercise it.
+The TS twins (`lib/rrule.ts`, `lib/nlpRepeat.ts`) share their test cases with the Rust ones; keep them in step. Themes: `lib/proTheme.ts` (pure, tested) writes CSS
+custom properties / `data-skin` / `data-density` on `<html>`; tokens in `styles/tokens.css`.
+
+**Verified live** (`tauri dev --config {identifier: com.styky.dev}` with `STYKY_PRO_DEV=1`, own data dir because the installed v0.1.0 was running and owns `com.styky.app`):
+verified: Pro card in both states (forced-on, and free with locked controls + Pro pills); a bogus key against the real Lemon Squeezy API returns "license_key not found." (rejection path and
+parsing are right); `styky add/ls/done` against the running app, including the free-tier `requires Styky Pro` error (exit code 3); a 15 s-due Critical item re-notified on its 60 s
+interval and a 5-minute pre-alert fired exactly once at due-5min (`last_nag_at`/`pre_fired_at` in the DB); custom repeat builder (every 2 weeks on Fri) saves and `complete` moves it +14 days
+keeping 17:00; Sticky skin / compact / large font / opacity render. In some runs a human clicked "Done" on the live toast (item became `done` seconds after it appeared), which also shows the
+Done activation works from a dev-build toast.
+**Installer** (`scripts/build.ps1`, release, 3 min): `Styky_0.1.0_x64-setup.exe` contains `bin\styky.exe` (379 KB, runs standalone: `--version`, "Styky isn't running" exit 2) and
+`bin\styky-path.ps1`; the generated `installer.nsi` calls the hooks (POSTINSTALL after install, PREUNINSTALL before anything is deleted) and the uninstall section deletes `bin\*`.
+`styky-path.ps1` was exercised against a scratch registry key (add / idempotent re-add / remove, 300-entry PATH, REG_EXPAND_SZ kept). **Not run end-to-end:** actually installing and
+uninstalling, because the installer would overwrite the owner's running v0.1.0 install (same identifier, same install dir, same uninstall key). Do that on a clean VM / second account.
+The bundler also copies `styky-cli.exe` next to `styky.exe` (harmless duplicate, removed on uninstall).
+**Not verified**: a real Lemon Squeezy key (no store yet); a live toast screenshot; light theme for the new UI; the MSIX build (still compiles: `cargo check --features store`).
+
+## Handoff updates (Pro v1)
+
+- New Rust modules: `license.rs`, `api.rs` (+ `proto.rs`), `nlp.rs`, `nlp_repeat.rs`, `cli/{main,mcp}.rs`. All modules are now `pub` in `lib.rs` (integration test + CLI).
+- New commands: `license_status, license_activate(key), license_remove, open_settings_pro`. New events: `pro-changed`, `open-pro-card` (to the Settings window).
+- New settings keys: `escalation_minutes, escalation_bring_forward, theme_tint, theme_opacity, theme_density, theme_accent, theme_skin, theme_font` (empty = default).
+- React: `lib/pro.ts` (`useLicense`, `usePro`), `lib/rrule.ts`, `lib/nlpRepeat.ts`, `lib/proTheme.ts`; components `ProPill`, `RepeatField`; app `ProCard`, `ConnectAI`.
+- Tests: `cargo test` (107 lib + 11 CLI/MCP unit + 4 end-to-end in `tests/cli.rs`), `pnpm test` (41).
+- Gotchas: (1) the Bash tool here **collapses backslashes** inside heredocs (`\\.\pipe\…` became `\.\pipe\…`) and rejects apostrophes in heredocs: write files with the Write/Edit tools.
+  (2) `$_` in `bash -c` PowerShell snippets is eaten; use the PowerShell tool. (3) A dev instance next to an installed Styky must use another identifier
+  (`pnpm tauri dev --config <file with {"identifier":"com.styky.dev"}>`), else single-instance hands over to the installed app and both share a DB; the Ctrl+Alt+N hotkey will then
+  report "already registered". (4) `cargo test` and `tauri dev` share `target/`; cargo's lock makes a second cargo wait.
+- Owner TODO: create the Lemon Squeezy store/product/variant (license keys on, activation limit 3), then set `STYKY_BUY_URL`, `LEMON_STORE_ID`, `LEMON_PRODUCT_ID` in `license.rs`.

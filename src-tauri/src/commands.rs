@@ -2,11 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::db::{Db, Res};
-use crate::model::{ExportFile, ImportResult, Item, ItemEdit};
+use crate::model::{ExportFile, ImportResult, Item, ItemEdit, gate_edit};
 use crate::{theme, window};
 
 pub fn now_ms() -> i64 {
@@ -36,14 +36,19 @@ pub fn list_items(app: AppHandle, db: State<Db>) -> Res<Vec<Item>> {
 }
 
 #[tauri::command]
-pub fn create_item(app: AppHandle, db: State<Db>, edit: ItemEdit) -> Res<Item> {
+pub fn create_item(app: AppHandle, db: State<Db>, mut edit: ItemEdit) -> Res<Item> {
+    gate_edit(&mut edit, None, crate::license::is_pro());
     let item = db.create(&edit, now_ms())?;
     changed(&app);
     Ok(item)
 }
 
 #[tauri::command]
-pub fn update_item(app: AppHandle, db: State<Db>, id: String, edit: ItemEdit) -> Res<Item> {
+pub fn update_item(app: AppHandle, db: State<Db>, id: String, mut edit: ItemEdit) -> Res<Item> {
+    if !crate::license::is_pro() {
+        let existing = db.get_item(&id)?;
+        gate_edit(&mut edit, Some(&existing), false);
+    }
     let item = db.update(&id, &edit, now_ms())?;
     changed(&app);
     Ok(item)
@@ -129,6 +134,50 @@ pub fn import_json(app: AppHandle, db: State<Db>, path: String, mode: String) ->
     Ok(result)
 }
 
+// ------------------------------------------------------------------ pro
+
+fn pro_changed(app: &AppHandle, before: bool) {
+    if before != crate::license::is_pro() {
+        let _ = app.emit("pro-changed", crate::license::is_pro());
+    }
+}
+
+#[tauri::command]
+pub fn license_status(db: State<Db>) -> crate::license::Status {
+    crate::license::status(&db, now_ms())
+}
+
+/// Activate a key (network: runs off the main thread).
+#[tauri::command]
+pub async fn license_activate(app: AppHandle, key: String) -> Res<crate::license::Status> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = app.state::<Db>();
+        let before = crate::license::is_pro();
+        let now = now_ms();
+        crate::license::activate(&db, &crate::license::UreqHttp, &key, &crate::license::instance_name(&db), now)?;
+        crate::license::refresh(&db, now);
+        pro_changed(&app, before);
+        Ok(crate::license::status(&db, now))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// "Remove license": free the activation slot, forget the key. Returns whether the slot was freed online.
+#[tauri::command]
+pub async fn license_remove(app: AppHandle) -> Res<bool> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = app.state::<Db>();
+        let before = crate::license::is_pro();
+        let freed = crate::license::deactivate(&db, &crate::license::UreqHttp)?;
+        crate::license::refresh(&db, now_ms());
+        pro_changed(&app, before);
+        Ok(freed)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 // ---------------------------------------------------------------- system
 
 #[tauri::command]
@@ -190,6 +239,19 @@ pub fn set_quickadd_hotkey(app: AppHandle, hotkey: String) -> Res<()> {
 #[tauri::command]
 pub fn open_settings(app: AppHandle) {
     crate::settings_win::show(&app);
+}
+
+/// Open Settings scrolled to the Styky Pro card (the "Pro" pill target).
+#[tauri::command]
+pub fn open_settings_pro(app: AppHandle) {
+    crate::settings_win::show(&app);
+    let _ = app.emit_to(crate::settings_win::LABEL, "open-pro-card", ());
+}
+
+/// Why the local API (CLI / MCP) is not serving, or None when it is fine (shown in Settings → Connect AI).
+#[tauri::command]
+pub fn api_status(status: State<std::sync::Arc<crate::api::ApiStatus>>) -> Option<String> {
+    status.error()
 }
 
 /// Why the saved quick-add hotkey is not active (None when it is registered).

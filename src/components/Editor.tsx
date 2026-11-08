@@ -4,21 +4,26 @@ import { motion } from "motion/react";
 import { X } from "lucide-react";
 import { api } from "../lib/api";
 import { fromLocalInput, toLocalInput } from "../lib/time";
-import type { ItemEdit, Priority, Repeat } from "../lib/types";
+import type { ItemEdit, Priority } from "../lib/types";
 import { pressSpring } from "../lib/motion";
-
-const REPEATS: { value: Repeat; label: string }[] = [
-  { value: "none", label: "Never" },
-  { value: "daily", label: "Daily" },
-  { value: "weekdays", label: "Weekdays" },
-  { value: "weekly", label: "Weekly" },
-  { value: "monthly", label: "Monthly" },
-];
+import { usePro } from "../lib/pro";
+import { ProPill } from "./ProPill";
+import { RepeatField } from "./RepeatField";
 
 const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 0, label: "Low" },
   { value: 1, label: "Normal" },
   { value: 2, label: "Urgent" },
+  { value: 3, label: "Critical" },
+];
+
+const PREALERTS: { value: number | null; label: string }[] = [
+  { value: null, label: "None" },
+  { value: 5, label: "5 minutes before" },
+  { value: 15, label: "15 minutes before" },
+  { value: 30, label: "30 minutes before" },
+  { value: 60, label: "1 hour before" },
+  { value: 1440, label: "1 day before" },
 ];
 
 const SAVE_DEBOUNCE_MS = 400;
@@ -43,6 +48,7 @@ interface Props {
 export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: Props) {
   // `initial` is a fresh object each render; keep what editing began with.
   const original = useRef(initial).current;
+  const pro = usePro();
   const [edit, setEdit] = useState<ItemEdit>(original);
   const editRef = useRef(edit);
   const idRef = useRef(itemId);
@@ -180,18 +186,22 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
         </div>
       </div>
 
+      <RepeatField value={edit.repeat} dueAt={edit.dueAt} onChange={(repeat) => patch({ repeat })} />
+
       <div className="ed-field">
-        <span className="ed-label">Repeat</span>
+        <span className="ed-label">
+          Early alert {!pro && <ProPill />}
+        </span>
         <select
           className="ed-input"
-          value={edit.repeat}
-          disabled={edit.dueAt == null}
-          title={edit.dueAt == null ? "Set a due time to repeat" : undefined}
-          onChange={(e) => patch({ repeat: e.target.value as Repeat })}
-          aria-label="Repeat"
+          value={edit.prealertMin ?? ""}
+          disabled={edit.dueAt == null || !pro}
+          title={edit.dueAt == null ? "Set a due time first" : undefined}
+          onChange={(e) => patch({ prealertMin: e.target.value === "" ? null : Number(e.target.value) })}
+          aria-label="Remind early"
         >
-          {REPEATS.map((r) => (
-            <option key={r.value} value={r.value}>
+          {PREALERTS.map((r) => (
+            <option key={r.label} value={r.value ?? ""}>
               {r.label}
             </option>
           ))}
@@ -199,7 +209,9 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
       </div>
 
       <div className="ed-field">
-        <span className="ed-label">Priority</span>
+        <span className="ed-label">
+          Priority {!pro && <ProPill title="Critical priority is part of Styky Pro" />}
+        </span>
         <div className="segmented" role="radiogroup" aria-label="Priority">
           {PRIORITIES.map((p) => (
             <button
@@ -208,7 +220,11 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
               role="radio"
               aria-checked={edit.priority === p.value}
               className={edit.priority === p.value ? "on" : ""}
-              onClick={() => patch({ priority: p.value })}
+              title={p.value === 3 ? (pro ? "Keeps notifying until done or snoozed" : "Critical keeps notifying until done: part of Styky Pro") : undefined}
+              onClick={() => {
+                if (p.value === 3 && !pro) void api.openSettingsPro();
+                else patch({ priority: p.value });
+              }}
             >
               {edit.priority === p.value && (
                 <motion.span layoutId="prio-thumb" className="thumb" transition={pressSpring} />

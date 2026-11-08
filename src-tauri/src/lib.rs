@@ -1,19 +1,24 @@
-mod commands;
-mod db;
+pub mod api;
+pub mod commands;
+pub mod db;
 #[cfg(windows)]
-mod desktop;
-mod model;
-mod notify;
-mod quickadd;
-mod repeat;
-mod scheduler;
-mod settings_win;
-mod snooze;
-mod store;
-mod sort;
-mod theme;
-mod tray;
-mod window;
+pub mod desktop;
+pub mod license;
+pub mod model;
+pub mod nlp;
+pub mod nlp_repeat;
+pub mod proto;
+pub mod notify;
+pub mod quickadd;
+pub mod repeat;
+pub mod scheduler;
+pub mod settings_win;
+pub mod snooze;
+pub mod store;
+pub mod sort;
+pub mod theme;
+pub mod tray;
+pub mod window;
 
 use tauri::{Manager, WindowEvent};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -61,6 +66,8 @@ pub fn run() {
             commands::quit,
             commands::quickadd_hotkey_error,
             commands::open_settings,
+            commands::open_settings_pro,
+            commands::api_status,
             commands::list_items,
             commands::create_item,
             commands::update_item,
@@ -76,6 +83,9 @@ pub fn run() {
             commands::import_json,
             commands::hide_quickadd,
             commands::set_quickadd_hotkey,
+            commands::license_status,
+            commands::license_activate,
+            commands::license_remove,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -107,6 +117,9 @@ pub fn run() {
             quickadd::setup(&handle);
             quickadd::init(&handle);
             scheduler::spawn(handle.clone());
+            spawn_license_check(handle.clone());
+            app.manage(std::sync::Arc::new(api::ApiStatus::default()));
+            spawn_api(handle.clone());
             Ok(())
         })
         .on_window_event(|win, event| {
@@ -157,6 +170,40 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Styky");
+}
+
+/// Serve the local API on the per-user named pipe (see `api.rs`).
+fn spawn_api(app: tauri::AppHandle) {
+    #[cfg(windows)]
+    tauri::async_runtime::spawn(async move {
+        let handler_app = app.clone();
+        let handler: std::sync::Arc<dyn Fn(&str) -> String + Send + Sync> = std::sync::Arc::new(move |line| {
+            let db = handler_app.state::<db::Db>();
+            let ctx = api::Ctx { db: &db, now: commands::now_ms(), pro: license::is_pro() };
+            let (out, changed) = api::handle_line(&ctx, line);
+            if changed {
+                let _ = tauri::Emitter::emit(&handler_app, "items-changed", ());
+            }
+            out
+        });
+        let status = app.state::<std::sync::Arc<api::ApiStatus>>().inner().clone();
+        if let Err(e) = api::serve(proto::pipe_name(), handler, status).await {
+            eprintln!("styky: local API is not available: {e}");
+        }
+    });
+    #[cfg(not(windows))]
+    let _ = app;
+}
+
+/// Load the cached entitlement, then re-check it (if due) at start and every 6 hours.
+fn spawn_license_check(app: tauri::AppHandle) {
+    license::refresh(&app.state::<db::Db>(), commands::now_ms());
+    std::thread::spawn(move || {
+        loop {
+            license::background_check(&app);
+            std::thread::sleep(Duration::from_secs(6 * 3600));
+        }
+    });
 }
 
 /// Release builds turn "launch at login" on once, the first time they run; after that the user's choice wins.

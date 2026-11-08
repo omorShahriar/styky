@@ -199,3 +199,143 @@ select option {
   color: var(--red);
   user-select: text;
 }
+
+/* Styky Pro card */
+.pro-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.pro-lede {
+  margin: 0;
+}
+.pro-benefits {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--label-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+.pro-actions {
+  display: flex;
+  gap: var(--s2);
+}
+.pro-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+.pro-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 18px;
+}
+.pro-key {
+  display: flex;
+  gap: var(--s2);
+}
+.pro-key input {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--r-btn);
+  background: var(--fill);
+  padding: 4px 10px;
+  line-height: 18px;
+  user-select: text;
+}
+.pro-msg {
+  margin: 0;
+  padding: 0 14px 12px;
+}
+.small {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+}
+#pro-card.flash .card {
+  animation: pro-flash 900ms var(--ease-out);
+}
+@keyframes pro-flash {
+  from {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  to {
+    box-shadow: 0 0 0 0.5px var(--hairline);
+  }
+}
+
+/* Connect AI */
+.ai-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.ai-lede {
+  margin: 0;
+}
+.snippet {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.snippet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.snippet pre {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-btn);
+  background: var(--fill);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 17px;
+  overflow-x: auto;
+  user-select: text;
+}
+.snippet .small,
+.ai-tier {
+  margin: 0;
+}
+code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.row-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.locked {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.swatch {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+input[type="range"] {
+  width: 120px;
+  accent-color: var(--accent);
+}

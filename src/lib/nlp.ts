@@ -3,10 +3,12 @@
  *
  * Grammar (tokens can appear anywhere in the line):
  *   #tag               tag / project
+ *   !!!                critical (priority 3, Pro: free builds fall back to urgent)
  *   !!                 urgent (priority 2)
  *   !                  explicit "normal" (priority 1, which is also the default; the chip confirms it was seen)
  *   !low               low (priority 0)
  *   every day|weekday|week|month   repeat (daily / weekdays / weekly / monthly)
+ *   Pro repeats (see nlpRepeat.ts): every 2 weeks, every mon,wed, last friday of the month, ... for 5 times / until dec 31
  *   @branch            branch / repo chip (`@release/2.3`), must start a word so e-mail addresses are left alone
  *   https://…          link
  *   anything chrono-node understands ("tomorrow 5pm", "fri 10am", "in 2h") becomes the due time.
@@ -16,6 +18,8 @@
 import * as chrono from "chrono-node";
 import type { ItemEdit, Priority, Repeat } from "./types";
 import { formatDue } from "./time";
+import { describeRepeat, firstMatch, isSimpleRepeat } from "./rrule";
+import { extractRepeat } from "./nlpRepeat";
 
 export interface QuickChip {
   kind: "date" | "tag" | "priority" | "repeat" | "branch" | "link";
@@ -33,21 +37,7 @@ export interface QuickParse {
   chips: QuickChip[];
 }
 
-const REPEAT_WORDS: Record<string, Repeat> = {
-  day: "daily",
-  weekday: "weekdays",
-  weekdays: "weekdays",
-  week: "weekly",
-  month: "monthly",
-};
-const REPEAT_LABEL: Record<Repeat, string> = {
-  none: "",
-  daily: "Every day",
-  weekdays: "Every weekday",
-  weekly: "Every week",
-  monthly: "Every month",
-};
-const PRIORITY_LABEL: Record<Priority, string> = { 0: "Low", 1: "Normal", 2: "Urgent" };
+const PRIORITY_LABEL: Record<Priority, string> = { 0: "Low", 1: "Normal", 2: "Urgent", 3: "Critical" };
 
 const DEFAULT_HOUR = 9;
 
@@ -80,9 +70,9 @@ export function parseQuick(input: string, now: Date = new Date()): QuickParse {
   if (t.match) link = t.match[0].replace(/[.,;)]+$/, "");
   text = t.rest;
 
-  t = take(text, /\bevery\s+(day|weekdays?|week|month)\b/i);
-  if (t.match) repeat = REPEAT_WORDS[t.match[1].toLowerCase()];
-  text = t.rest;
+  const rep = extractRepeat(text, now);
+  if (rep.repeat) repeat = rep.repeat;
+  text = rep.rest;
 
   t = take(text, /(?<=\s)@([\w][\w./-]*)/);
   if (t.match) branch = t.match[1].replace(/[.,;]+$/, "");
@@ -97,9 +87,9 @@ export function parseQuick(input: string, now: Date = new Date()): QuickParse {
     priority = 0;
     prioritySeen = true;
   } else {
-    t = take(text, /(?<=\s)(!{1,2})(?=\s)/);
+    t = take(text, /(?<=\s)(!{1,3})(?=\s)/);
     if (t.match) {
-      priority = t.match[1].length === 2 ? 2 : 1;
+      priority = t.match[1].length === 3 ? 3 : t.match[1].length === 2 ? 2 : 1;
       prioritySeen = true;
     }
   }
@@ -118,13 +108,13 @@ export function parseQuick(input: string, now: Date = new Date()): QuickParse {
     if (clean(without)) title = without;
   }
   title = clean(title);
-  if (dueAt == null && repeat !== "none") dueAt = nextDefaultTime(now, repeat === "weekdays");
+  if (dueAt == null && repeat !== "none") dueAt = firstMatch(repeat, now, DEFAULT_HOUR) ?? nextDefaultTime(now, repeat === "weekdays");
 
   const chips: QuickChip[] = [];
   if (dueAt != null) chips.push({ kind: "date", label: formatDue(dueAt, now.getTime()) });
   if (tag) chips.push({ kind: "tag", label: `#${tag}` });
   if (prioritySeen) chips.push({ kind: "priority", label: PRIORITY_LABEL[priority] });
-  if (repeat !== "none") chips.push({ kind: "repeat", label: REPEAT_LABEL[repeat] });
+  if (repeat !== "none") chips.push({ kind: "repeat", label: describeRepeat(repeat) + (isSimpleRepeat(repeat) ? "" : " · Pro") });
   if (branch) chips.push({ kind: "branch", label: branch });
   if (link) chips.push({ kind: "link", label: hostOf(link) });
 
@@ -158,5 +148,6 @@ export function toItemEdit(p: QuickParse): ItemEdit {
     tag: p.tag,
     link: p.link,
     branch: p.branch,
+    prealertMin: null,
   };
 }

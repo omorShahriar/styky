@@ -83,22 +83,38 @@ pub fn when_text(at: i64, now: i64) -> String {
     }
 }
 
-fn item_lines(item: &Item, now: i64) -> (String, String) {
+/// Which toast we are building.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Kind {
+    /// The reminder is due.
+    Due,
+    /// Critical item, still open: "Still due".
+    Nag,
+}
+
+fn item_lines(item: &Item, now: i64, kind: Kind) -> (String, String) {
     let mut when = match (item.due_at, item.snoozed_until) {
         (Some(due), Some(_)) => format!("Snoozed · was due {}", when_text(due, now)),
+        (Some(due), None) if kind == Kind::Nag => format!("Still due · since {}", when_text(due, now)),
         (Some(due), None) => format!("Due {}", when_text(due, now)),
         (None, _) => "Reminder".to_string(),
     };
-    if item.priority == 2 {
-        when.push_str(" · Urgent");
+    match item.priority {
+        2 => when.push_str(" · Urgent"),
+        3 => when.push_str(" · Critical"),
+        _ => {}
     }
     let tag = item.tag.as_ref().map(|t| format!("#{t}")).unwrap_or_default();
     (when, tag)
 }
 
 pub fn item_xml(item: &Item, now: i64, default_snooze: &str) -> String {
+    item_xml_kind(item, now, default_snooze, Kind::Due)
+}
+
+pub fn item_xml_kind(item: &Item, now: i64, default_snooze: &str, kind: Kind) -> String {
     let default_snooze = if ["10m", "1h", "evening", "tomorrow"].contains(&default_snooze) { default_snooze } else { "10m" };
-    let (line1, line2) = item_lines(item, now);
+    let (line1, line2) = item_lines(item, now, kind);
     let id = esc(&item.id);
     let line2 = if line2.is_empty() { String::new() } else { format!("<text>{}</text>", esc(&line2)) };
     format!(
@@ -121,6 +137,30 @@ pub fn item_xml(item: &Item, now: i64, default_snooze: &str) -> String {
         title = esc(&item.title),
         line1 = esc(&line1),
         default_snooze = default_snooze,
+    )
+}
+
+/// Heads-up toast before the due time (Pro pre-alert): short-lived, no snooze controls.
+pub fn prealert_xml(item: &Item, now: i64) -> String {
+    let due = item.due_at.unwrap_or(now);
+    let mins = ((due - now).max(0) + 59_999) / 60_000;
+    let left = match mins {
+        m if m >= 1440 => "tomorrow".to_string(),
+        m if m >= 120 => format!("in {} h", (m + 30) / 60),
+        m if m >= 60 => "in 1 h".to_string(),
+        m => format!("in {} min", m.max(1)),
+    };
+    let id = esc(&item.id);
+    format!(
+        r#"<toast launch="open:{id}" activationType="foreground">
+  <visual><binding template="ToastGeneric">
+    <text>{title}</text><text>Due {left} · {when}</text>
+  </binding></visual>
+  <actions><action content="Done" arguments="done:{id}" activationType="foreground"/></actions>
+</toast>"#,
+        title = esc(&item.title),
+        left = esc(&left),
+        when = esc(&when_text(due, now)),
     )
 }
 
@@ -173,6 +213,22 @@ fn default_snooze(app: &AppHandle) -> String {
 pub fn show_item(app: &AppHandle, item: &Item) {
     if let Err(e) = show_xml(app, &item_xml(item, now_ms(), &default_snooze(app)), Some(&item.id)) {
         eprintln!("styky: toast failed: {e}");
+    }
+}
+
+/// Heads-up before an item is due (Pro).
+pub fn show_prealert(app: &AppHandle, item: &Item) {
+    // A different tag from the due toast so it never replaces (or is replaced by) it.
+    if let Err(e) = show_xml(app, &prealert_xml(item, now_ms()), Some(&format!("pre:{}", item.id))) {
+        eprintln!("styky: pre-alert toast failed: {e}");
+    }
+}
+
+/// Re-notification of a Critical item (Pro). Same tag as the due toast: it replaces the previous one instead of stacking.
+pub fn show_nag(app: &AppHandle, item: &Item) {
+    let xml = item_xml_kind(item, now_ms(), &default_snooze(app), Kind::Nag);
+    if let Err(e) = show_xml(app, &xml, Some(&item.id)) {
+        eprintln!("styky: nag toast failed: {e}");
     }
 }
 
@@ -239,6 +295,31 @@ mod tests {
         assert!(xml.contains("#api"));
         assert!(xml.contains(&format!("snooze:{}", item.id)));
         assert!(xml.contains("Done"));
+    }
+
+    #[test]
+    fn critical_and_nag_toasts_say_so() {
+        let mut item = Item::blank("c1");
+        item.due_at = Some(1_700_000_000_000);
+        item.priority = 3;
+        let due = item_xml(&item, 1_700_000_000_000, "10m");
+        assert!(due.contains("Critical") && due.contains("Due Today"), "{due}");
+        let nag = item_xml_kind(&item, 1_700_000_600_000, "10m", Kind::Nag);
+        assert!(nag.contains("Still due") && nag.contains("Critical"), "{nag}");
+        assert!(nag.contains("done:c1") && nag.contains("snooze:c1"));
+    }
+
+    #[test]
+    fn prealert_toast_counts_down_in_plain_words() {
+        let mut item = Item::blank("p1");
+        let now = 1_700_000_000_000;
+        item.due_at = Some(now + 15 * 60_000);
+        let xml = prealert_xml(&item, now);
+        assert!(xml.contains("Due in 15 min") && xml.contains("done:p1") && !xml.contains("snooze"), "{xml}");
+        item.due_at = Some(now + 60 * 60_000);
+        assert!(prealert_xml(&item, now).contains("Due in 1 h"));
+        item.due_at = Some(now + 1440 * 60_000);
+        assert!(prealert_xml(&item, now).contains("Due tomorrow"));
     }
 
     #[test]

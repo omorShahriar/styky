@@ -49,7 +49,7 @@
   display: flex;
   align-items: flex-start;
   gap: var(--s3);
-  padding: 10px 14px;
+  padding: var(--row-pad-y, 10px) 14px;
   border-radius: var(--r-card);
   transition: background-color var(--dur-press) var(--ease-out);
 }
@@ -116,8 +116,8 @@
   gap: var(--s2);
 }
 .title {
-  font-size: 15px;
-  line-height: 20px;
+  font-size: var(--fs-title, 15px);
+  line-height: var(--lh-title, 20px);
   font-weight: 600;
   letter-spacing: -0.01em;
   overflow: hidden;
@@ -142,12 +142,16 @@
   background: var(--red);
 }
 
+.urgent-dot.critical {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--red) 30%, transparent);
+}
+
 .meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   margin-top: 1px;
-  font-size: 12px;
+  font-size: var(--fs-meta, 12px);
   line-height: 16px;
   color: var(--label-2);
 }
@@ -448,12 +452,17 @@
 }
 .ed-field {
   display: grid;
-  grid-template-columns: 56px 1fr;
+  grid-template-columns: 84px 1fr;
   align-items: center;
   gap: var(--s2);
 }
 .ed-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
   font-size: 12px;
+  line-height: 16px;
   color: var(--label-2);
 }
 .ed-input {
@@ -495,7 +504,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   padding: 2px;
   border-radius: var(--r-btn);
   background: var(--fill);
@@ -662,4 +671,58 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   display: flex;
   justify-content: flex-end;
   gap: var(--s2);
+}
+
+/* Pro: custom repeat builder */
+.repeat-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.repeat-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--r-btn);
+  background: var(--fill);
+  font-size: 12px;
+}
+.repeat-builder.locked {
+  opacity: 0.6;
+}
+.rb-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.rb-num {
+  width: 56px;
+}
+.rb-days {
+  display: flex;
+  gap: 4px;
+}
+.rb-day {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 12px;
+  background: var(--fill);
+  color: var(--label-2);
+  transition:
+    background-color var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+.rb-day.on {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.rb-day:active {
+  transform: scale(0.95);
+}
+.rb-summary {
+  margin: 0;
+  color: var(--label-2);
 }

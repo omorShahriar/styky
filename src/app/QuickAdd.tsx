@@ -110,7 +110,7 @@ export default function QuickAdd() {
             parsed.chips.map((c) => {
               const Icon = ICONS[c.kind];
               return (
-                <span key={c.kind} className={`qa-chip ${c.kind}${c.kind === "priority" && parsed.priority === 2 ? " urgent" : ""}`}>
+                <span key={c.kind} className={`qa-chip ${c.kind}${c.kind === "priority" && parsed.priority >= 2 ? " urgent" : ""}`}>
                   <Icon size={12} strokeWidth={2} />
                   {c.label}
                 </span>
