@@ -44,6 +44,18 @@ button {
   outline-offset: 1px;
 }
 
+/* Every pressable thing gives the same 0.97 press. */
+.menu-item,
+.toast-action {
+  transition:
+    background-color var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+.menu-item:not(:disabled):active,
+.toast-action:active {
+  transform: scale(0.97);
+}
+
 .tnum {
   font-feature-settings: "tnum", "cv11";
 }

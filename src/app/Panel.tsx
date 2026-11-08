@@ -156,7 +156,8 @@ function isTyping(t: EventTarget | null): boolean {
 
 export default function Panel() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { items, now, loaded, draft, completedOpen } = useStore();
+  const { items, now, loaded, draft, completedOpen, settings } = useStore();
+  const hotkey = (settings.quickadd_hotkey || "Ctrl+Alt+N").split("+").map((k) => (k === "Super" ? "Win" : k));
 
   // theme + data wiring
   useEffect(() => {
@@ -336,7 +337,10 @@ export default function Panel() {
               </div>
               <p className="empty-title">Nothing pressing.</p>
               <p className="empty-hint">
-                <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>N</kbd> to add.
+                {hotkey.map((k, i) => (
+                  <span key={i}>{i > 0 && " "}<kbd>{k}</kbd></span>
+                ))}{" "}
+                to add.
               </p>
             </div>
           )}
