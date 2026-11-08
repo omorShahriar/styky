@@ -52,6 +52,7 @@ pub fn run() {
             commands::set_autostart,
             commands::hide_panel,
             commands::quit,
+            commands::quickadd_hotkey_error,
             commands::open_settings,
             commands::list_items,
             commands::create_item,

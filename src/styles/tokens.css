@@ -24,6 +24,9 @@
   --fill-hover: rgba(0, 0, 0, 0.08);
   --fill-press: rgba(0, 0, 0, 0.12);
   --menu-bg: rgba(250, 250, 252, 0.88);
+  --win-bg: #f2f2f7;
+  --group-bg: #ffffff;
+  --seg-on: #ffffff;
   --menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 
   /* tag chips: hue comes from the tag, lightness from the theme */
@@ -59,8 +62,10 @@
   --dur-pop: 160ms;
 }
 
+/* Dark: follows Windows unless the Theme setting forces light/dark (data-theme on <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --red: #ff6961;
     --orange: #ffb340;
     --label: rgba(255, 255, 255, 0.85);
@@ -76,6 +81,35 @@
     --tag-l: 74%;
     --tag-bg-a: 0.2;
     --menu-bg: rgba(44, 44, 48, 0.88);
+    --win-bg: #1c1c1e;
+    --group-bg: #2c2c2e;
+    --seg-on: #636366;
     --menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.12);
   }
 }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+    --red: #ff6961;
+    --orange: #ffb340;
+    --label: rgba(255, 255, 255, 0.85);
+    --label-2: rgba(255, 255, 255, 0.55);
+    --label-3: rgba(255, 255, 255, 0.3);
+  
+    --panel-tint: rgba(30, 30, 32, 0.5);
+    --panel-edge: rgba(255, 255, 255, 0.1);
+    --hairline: rgba(255, 255, 255, 0.08);
+    --fill: rgba(255, 255, 255, 0.07);
+    --fill-hover: rgba(255, 255, 255, 0.11);
+    --fill-press: rgba(255, 255, 255, 0.16);
+    --tag-l: 74%;
+    --tag-bg-a: 0.2;
+    --menu-bg: rgba(44, 44, 48, 0.88);
+    --win-bg: #1c1c1e;
+    --group-bg: #2c2c2e;
+    --seg-on: #636366;
+    --menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+

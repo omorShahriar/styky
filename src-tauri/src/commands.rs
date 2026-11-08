@@ -174,6 +174,12 @@ pub fn open_settings(app: AppHandle) {
     crate::settings_win::show(&app);
 }
 
+/// Why the saved quick-add hotkey is not active (None when it is registered).
+#[tauri::command]
+pub fn quickadd_hotkey_error() -> Option<String> {
+    crate::quickadd::startup_error()
+}
+
 #[tauri::command]
 pub fn quit(app: AppHandle) {
     app.exit(0);

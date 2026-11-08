@@ -89,7 +89,7 @@ function Menu({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="menu" role="menu" ref={ref}>
-      <button className="menu-item" role="menuitem" disabled>
+      <button className="menu-item" role="menuitem" onClick={() => { onClose(); void api.openSettings(); }}>
         <Settings size={14} strokeWidth={1.75} /> Settings…
       </button>
       <div className="menu-sep" />

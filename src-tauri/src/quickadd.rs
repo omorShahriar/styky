@@ -5,6 +5,21 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::db::Db;
 
+use std::sync::Mutex;
+
+/// Why the saved hotkey could not be registered at startup (shown in Settings).
+static STARTUP_ERROR: Mutex<Option<String>> = Mutex::new(None);
+
+pub fn startup_error() -> Option<String> {
+    STARTUP_ERROR.lock().ok().and_then(|g| g.clone())
+}
+
+fn set_startup_error(e: Option<String>) {
+    if let Ok(mut g) = STARTUP_ERROR.lock() {
+        *g = e;
+    }
+}
+
 pub const LABEL: &str = "quickadd";
 pub const DEFAULT_HOTKEY: &str = "Ctrl+Alt+N";
 /// Logical size of the bar when it shows no chips.
@@ -36,13 +51,14 @@ pub fn init(app: &AppHandle) {
     let hotkey = saved_hotkey(app);
     if let Err(e) = register(app, &hotkey) {
         eprintln!("styky: {e}");
+        set_startup_error(Some(e));
     }
 }
 
 /// Change the hotkey: register the new one first so a bad value keeps the old one.
 pub fn rebind(app: &AppHandle, new: &str) -> Result<(), String> {
     let old = saved_hotkey(app);
-    if old.eq_ignore_ascii_case(new) {
+    if old.eq_ignore_ascii_case(new) && startup_error().is_none() {
         return Ok(());
     }
     let gs = app.global_shortcut();
@@ -53,6 +69,7 @@ pub fn rebind(app: &AppHandle, new: &str) -> Result<(), String> {
         let _ = register(app, &old);
         return Err(e);
     }
+    set_startup_error(None);
     app.state::<Db>().set_setting("quickadd_hotkey", new)?;
     let _ = app.emit("settings-changed", ());
     Ok(())

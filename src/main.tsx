@@ -4,11 +4,12 @@ import ReactDOM from "react-dom/client";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import Panel from "./app/Panel";
 import QuickAdd from "./app/QuickAdd";
+import Settings from "./app/Settings";
 import { MotionConfig } from "motion/react";
 
 // One bundle, one page; the window label picks which app to show.
 const label = getCurrentWindow().label;
-const App = label === "quickadd" ? QuickAdd : Panel;
+const App = label === "quickadd" ? QuickAdd : label === "settings" ? Settings : Panel;
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
