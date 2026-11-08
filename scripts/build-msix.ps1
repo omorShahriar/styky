@@ -6,12 +6,12 @@
   Tauri has no MSIX bundler, so this stages styky.exe + tile assets + AppxManifest.xml and packs them with makeappx.
   Identity values come from Partner Center (see docs/STORE.md). Defaults are local-test placeholders.
 
-  Local test:  .\scripts\build-msix.ps1                       (self-signed, writes a .cer to trust)
-  For Store:   .\scripts\build-msix.ps1 -IdentityName "1234Name.Styky" -Publisher "CN=GUID" `
-                 -PublisherDisplayName "Your Name" -Unsigned
+  Store upload: .\scripts\build-msix.ps1 -Store               (real Partner Center identity, unsigned)
+  Local test:   .\scripts\build-msix.ps1                      (self-signed, writes a .cer to trust)
   The Store signs the upload itself, so a Store submission needs no certificate.
 #>
 param(
+  [switch]$Store,                   # use the Partner Center identity below and skip signing
   [string]$IdentityName = "Styky.LocalTest",
   [string]$Publisher = "CN=StykyLocalTest",
   [string]$PublisherDisplayName = "Styky Local Test",
@@ -21,6 +21,14 @@ param(
   [string]$OutDir
 )
 $ErrorActionPreference = "Stop"
+
+# Partner Center → Product management → Product identity (Store ID 9NZ2ZDFQJLB5). Public values, safe to commit.
+if ($Store) {
+  $IdentityName = "omor.dev.Styky"
+  $Publisher = "CN=150ED2D0-F7B0-4A9D-B63F-68D0C7FDD60C"
+  $PublisherDisplayName = "omor.dev"
+  $Unsigned = $true
+}
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $root
 if (-not $OutDir) { $OutDir = Join-Path $root "dist-msix" }

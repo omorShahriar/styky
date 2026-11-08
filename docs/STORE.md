@@ -4,24 +4,28 @@ Step-by-step for the owner. The Store flavor is the same app packaged as **MSIX*
 Store MSIX packages for free, so no code-signing certificate is needed. The NSIS/GitHub build is unchanged (see
 [RELEASING.md](RELEASING.md)).
 
-## 1. Partner Center account (one-time)
+## 1. Partner Center account ✅ done
 
-1. Go to <https://partner.microsoft.com/dashboard/registration/developer> and sign in with a Microsoft account.
-2. Choose **Individual** account type, fill in your name, address and contact details, and pay the one-time registration fee
-   (about US $19 depending on country). Verification can take from minutes to a few days.
-3. In **Apps and games**, click **New product → MSIX or PWA app** and **reserve the name `Styky`**. Reservations last 3 months
-   until you submit; if the name is taken, pick a variation (e.g. "Styky Reminders"). The package display name does not need
-   to match the reserved name exactly, but the Store listing uses the reserved one.
+The developer account is registered and the name **Styky** is reserved.
 
-## 2. Copy the Identity values
+- **Store ID:** `9NZ2ZDFQJLB5`
+- **Store link** (live once published): <https://apps.microsoft.com/detail/9NZ2ZDFQJLB5>
 
-Open the product → **Product management → Product identity**. Copy three values:
+## 2. Product identity ✅ done
 
-| Partner Center field | `build-msix.ps1` parameter | Looks like |
-|---|---|---|
-| Package/Identity/Name | `-IdentityName` | `12345YourName.Styky` |
-| Package/Identity/Publisher | `-Publisher` | `CN=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX` |
-| Package/Properties/PublisherDisplayName | `-PublisherDisplayName` | `Omor Shahriar` |
+These come from Partner Center → the product → **Product management → Product identity**. They're public package metadata,
+not secrets, so they're baked into `build-msix.ps1 -Store`.
+
+| Partner Center field | Value |
+|---|---|
+| Package/Identity/Name | `omor.dev.Styky` |
+| Package/Identity/Publisher | `CN=150ED2D0-F7B0-4A9D-B63F-68D0C7FDD60C` |
+| Package/Properties/PublisherDisplayName | `omor.dev` |
+| Package Family Name (PFN) | `omor.dev.Styky_d017wbhzahrzj` |
+
+The PFN is what Windows uses for the installed Store app. For example, toasts show under the AUMID
+`omor.dev.Styky_d017wbhzahrzj!Styky`, and its `%APPDATA%\com.styky.app` data is redirected to
+`%LOCALAPPDATA%\Packages\omor.dev.Styky_d017wbhzahrzj\LocalCache\Roaming\com.styky.app\`.
 
 ## 3. Build the package
 
@@ -29,23 +33,23 @@ Prerequisites: the normal build tools (Node, pnpm, Rust, VS Build Tools) plus th
 through `winget` if `makeappx.exe` is missing.
 
 ```powershell
-.\scripts\build-msix.ps1 `
-  -IdentityName "12345YourName.Styky" `
-  -Publisher "CN=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" `
-  -PublisherDisplayName "Omor Shahriar" `
-  -Unsigned
+.\scripts\build-msix.ps1 -Store
 ```
+
+`-Store` fills in the identity above and builds **unsigned**, which is what Partner Center expects. Add `-SkipBuild` to reuse an
+existing `src-tauri\target\release\styky.exe`, but only if no `.rs`/`.ts` file changed since that build.
 
 Output: `dist-msix\Styky_<version>_x64.msix`. The version comes from `src-tauri/tauri.conf.json` with a `.0` appended
 (`0.1.0` becomes `0.1.0.0`; the Store reserves the 4th part and every submission must have a higher version than the last).
 
-`-Unsigned` is right for a Store upload: the Store signs the package with its own certificate after certification.
-Without `-Unsigned` the script signs with a throwaway self-signed certificate for local testing only (it generates the
+Unsigned is right for a Store upload: the Store signs the package with its own certificate after certification.
+Without `-Store`/`-Unsigned` the script signs with a throwaway self-signed certificate for local testing only (it generates the
 cert, signs, and deletes the private key, so there is nothing to keep safe or commit). If you have changed a `.rs`/`.ts`
 file since the last build, don't pass `-SkipBuild`.
 
-**Local test before you submit** (optional but recommended): run the script without `-IdentityName`/`-Publisher`/`-Unsigned`,
-then in an **admin** PowerShell trust the printed `.cer` and install:
+**Local test before you submit** (optional but recommended): run the script with no switches, which uses a `Styky.LocalTest`
+identity and a throwaway certificate. Then either turn on **Developer Mode** (Settings → System → Advanced → For developers),
+or in an **admin** PowerShell trust the printed `.cer`, and install:
 
 ```powershell
 Import-Certificate -FilePath dist-msix\styky-test.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
@@ -60,10 +64,14 @@ the same time; they share the same app identifier and single-instance lock and t
 1. In Partner Center open the product → **Start your submission**.
 2. **Pricing and availability:** Markets: all (or your choice). Price: **Free**. Visibility: Public.
 3. **Properties:** Category **Productivity**. Privacy policy URL:
-   `https://github.com/omorShahriar/styky/blob/main/docs/PRIVACY.md` (make sure the repo is public and this file is pushed).
-   System requirements: leave defaults. "Declare that this app can run on Windows desktop" only.
-4. **Age ratings:** complete the questionnaire (IARC). Styky has no violence, user-generated sharing, purchases, location or
-   web access, so every answer is "No"; the result should be **PEGI 3 / ESRB Everyone / 3+**.
+   `https://github.com/omorShahriar/styky/blob/main/docs/PRIVACY.md`. Website: `https://styky.pages.dev/`.
+   Support contact: `https://github.com/omorShahriar/styky/issues`. System requirements: leave defaults.
+   **Product declarations:** don't tick "uses Microsoft Store in-app purchase". Once Pro ships, tick the declaration that the
+   app **uses a third-party commerce system** for in-app purchases (Lemon Squeezy, policy 10.8). Non-game apps keep 100% of
+   that revenue. Until then there's nothing to declare.
+4. **Age ratings:** complete the questionnaire (IARC). Styky has no violence, user-generated sharing, location or
+   web browsing, so every answer is "No". The v0.1.0 package has no purchases. The result should be **PEGI 3 / ESRB Everyone / 3+**.
+   When a Pro-enabled version ships, update the questionnaire's in-app purchases answer to "Yes".
 5. **Packages:** upload `Styky_<version>_x64.msix`. Partner Center validates the Identity values against your reservation; a
    mismatch is rejected immediately with the expected value, so re-run the script with the right one.
 6. **Store listings (en-US):** fill in the fields below.
@@ -83,7 +91,7 @@ the same time; they share the same app identifier and single-instance lock and t
 | Store logos (optional but recommended) | 300×300 app tile logo (1:1, required for the Store tile) and 1080×1080 (1:1), PNG, from `assets/icon.svg` |
 | Search terms (optional) | reminders, sticky notes, desktop widget, to-do, tasks |
 | Copyright and trademark info | © 2026 Omor Shahriar. MIT License. |
-| Website / Support contact | `https://github.com/omorShahriar/styky` and `https://github.com/omorShahriar/styky/issues` |
+| Website / Support contact | `https://styky.pages.dev/` and `https://github.com/omorShahriar/styky/issues` |
 
 Screenshot ideas: (1) the panel on a desktop with a few reminders (dark), (2) the quick-add bar with parsed chips,
 (3) a reminder toast with the Snooze dropdown, (4) an expanded reminder with a markdown checklist, (5) Settings, (6) light theme.
@@ -130,5 +138,7 @@ Take them at 1920×1080 display scale 100%.
 - Store users do not use Styky's built-in updater: it is hidden in the Store flavor.
 - The Store version keeps its data separately from the NSIS version (`%APPDATA%\com.styky.app` is virtualized per package,
   see `docs/NOTES.md` → Store (MSIX) notes). Users switching builds can move reminders with Settings → Export / Import.
-- A paid "Pro" unlock later needs in-app purchase (Windows.Services.Store) work in the app; MSIX packaging is the prerequisite
-  and is now in place.
+- **Styky Pro** in the Store build uses the same Lemon Squeezy license key as the GitHub build, not `Windows.Services.Store`
+  (see [PRO.md](PRO.md)). The listing stays **Free**; Pro is an optional unlock from the original author, which keeps it clear of
+  policy 10.8.7 on charging for freely available open-source software. When the Pro version is submitted, tick the third-party
+  commerce declaration and update the age-rating purchase answer (see step 4 above).
