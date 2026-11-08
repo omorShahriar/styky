@@ -3,7 +3,7 @@ import { AlarmClock, CalendarClock } from "lucide-react";
 import { useStore } from "../lib/store";
 import { fromLocalInput, snoozeHint, snoozePresets, toLocalInput } from "../lib/time";
 
-const WIDTH = 224;
+const WIDTH = 276;
 
 /** Snooze popover for the item in `snoozeFor`; one instance lives in the Panel. */
 export function SnoozeMenu() {

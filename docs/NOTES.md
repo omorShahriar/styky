@@ -170,3 +170,25 @@ Items are camelCase JSON, times unix ms UTC. Settings: `autoclear_days` (7), `qu
 **Stubbed for M4**
 - Settings window (header and tray `Settings...` are placeholders; tray emits `open-settings`): theme, hotkey recorder, autostart, autoclear, default snooze, export/import, updater/about.
 - Updater, NSIS installer, app icon, motion polish, README (hotkeys + Win+D note). Pause state is not persisted and has no panel indicator.
+
+## M4 notes (polish and ship)
+
+Deviations / decisions:
+- **Settings window** (`settings` label, `capabilities/settings.json`, `settings_win.rs`) is a normal *decorated, opaque* window (480x660, hidden on close),
+  not a glass panel: grouped inset cards on `--win-bg`/`--group-bg` tokens. It is not topmost, so it does **not** call `desktop::suspend`
+  (the Show-Desktop watcher sees it as an ordinary app window). `open_settings` command + tray item + header `⋯ → Settings…` open it.
+  The old `open-settings` event is no longer emitted.
+- **Theme override**: setting `theme` = system|light|dark. `lib/theme.ts` sets `data-theme` on `<html>`; `tokens.css` has dark tokens under
+  `@media (prefers-color-scheme: dark) :root:not([data-theme=light])` and `:root[data-theme=dark]`. Acrylic itself still follows Windows.
+- **Default snooze** (`default_snooze`, default `10m`) preselects the toast dropdown (`defaultInput`). Settings defaults now also contain `theme`.
+- **Hotkey recorder**: `lib/hotkey.ts` (vitest) builds the accelerator; `set_quickadd_hotkey` errors show inline. A *startup* registration
+  failure is kept in `quickadd::STARTUP_ERROR` and surfaced via `quickadd_hotkey_error` so Settings shows it too. Known quirk: pressing the
+  currently registered combo while recording triggers quick-add instead.
+- **Updater**: `tauri-plugin-updater` + `tauri-plugin-process`, key at `%USERPROFILE%\.tauri\styky.key` (generated with an empty password;
+  outside the repo, `*.key` is also git-ignored), public key in `tauri.conf.json`, endpoint placeholder `https://github.com/OWNER/REPO/...`.
+  A failed check shows a friendly message. `scripts/build.ps1` loads the key into `TAURI_SIGNING_PRIVATE_KEY` and runs `pnpm tauri build`.
+- **Icon**: `assets/icon.svg` (sticky note, folded corner) -> `pnpm tauri icon assets/icon.svg`; the tray uses the same app icon. The generated
+  `android/` and `ios/` icon folders were deleted. Bundle `targets` is `["nsis"]` only.
+- **Motion**: the springs, completion choreography (check, 250 ms, collapse), `:focus-visible` rings, press scale and empty state already existed from
+  M1-M3; M4 added: reduced-motion fades for the motion springs/variants (`lib/motion.ts` reads `prefers-reduced-motion` at load), a global 0.97 press on
+  menu items / toast actions, an empty state that shows the configured hotkey, and a spring-animated segmented control and switch in Settings.

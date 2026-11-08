@@ -631,14 +631,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .snooze-menu {
   position: fixed;
   right: auto;
-  width: 224px;
+  width: 276px;
   z-index: 30;
   transform-origin: top right;
 }
 .menu-item .grow {
+  white-space: nowrap;
   flex: 1;
 }
 .menu-hint {
+  white-space: nowrap;
   color: var(--label-3);
   font-size: 12px;
 }
