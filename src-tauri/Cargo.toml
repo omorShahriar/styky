@@ -61,5 +61,6 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
+# unwind (not abort): the API handler runs on arbitrary CLI/MCP text and catches a panic per request instead of killing the app.
+panic = "unwind"
 strip = true

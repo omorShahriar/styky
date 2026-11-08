@@ -107,10 +107,35 @@ fn method_of(tool: &str) -> Option<&'static str> {
     })
 }
 
-/// Answer one JSON-RPC message. `None` for notifications (and responses we ignore).
+fn invalid_request(id: Value, why: &str) -> Value {
+    json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32600, "message": format!("Invalid Request: {why}")}})
+}
+
+/// Answer one JSON-RPC message or batch. `None` for notifications (and responses we ignore).
+/// A batch (JSON array) is answered element by element with an array of the replies (none -> no reply).
 pub fn handle(msg: &Value, call: CallFn) -> Option<Value> {
-    let method = msg.get("method").and_then(Value::as_str)?;
-    let id = msg.get("id").cloned();
+    if let Some(batch) = msg.as_array() {
+        if batch.is_empty() {
+            return Some(invalid_request(Value::Null, "empty batch"));
+        }
+        let replies: Vec<Value> = batch.iter().filter_map(|m| handle_one(m, call)).collect();
+        return (!replies.is_empty()).then_some(Value::Array(replies));
+    }
+    handle_one(msg, call)
+}
+
+fn handle_one(msg: &Value, call: CallFn) -> Option<Value> {
+    let Some(obj) = msg.as_object() else {
+        return Some(invalid_request(Value::Null, "expected a JSON object"));
+    };
+    let id = obj.get("id").cloned();
+    let Some(method) = obj.get("method").and_then(Value::as_str) else {
+        // A response to something we never asked: ignore. Anything else without a method is malformed.
+        if obj.contains_key("result") || obj.contains_key("error") {
+            return None;
+        }
+        return Some(invalid_request(id.unwrap_or(Value::Null), "missing method"));
+    };
     let reply = |result: Result<Value, (i64, String)>| -> Option<Value> {
         let id = id.clone()?; // notifications get no reply
         Some(match result {
@@ -247,5 +272,42 @@ mod tests {
         assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("requires Styky Pro"));
         let r = ask(json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"zzz"}}), |_, _| unreachable!()).unwrap();
         assert_eq!(r["error"]["code"], -32602);
+    }
+
+    #[test]
+    fn batches_are_answered_element_by_element() {
+        let batch = json!([
+            {"jsonrpc":"2.0","id":1,"method":"ping"},
+            {"jsonrpc":"2.0","method":"notifications/initialized"},
+            {"jsonrpc":"2.0","id":2,"method":"tools/list"},
+            {"jsonrpc":"2.0","id":3,"method":"nope"}
+        ]);
+        let r = ask(batch, |_, _| unreachable!()).unwrap();
+        let arr = r.as_array().unwrap();
+        assert_eq!(arr.len(), 3, "the notification gets no reply");
+        assert_eq!(arr[0]["id"], 1);
+        assert!(arr[1]["result"]["tools"].is_array());
+        assert_eq!(arr[2]["error"]["code"], -32601);
+        // A batch of only notifications: nothing to send.
+        assert!(ask(json!([{"jsonrpc":"2.0","method":"notifications/initialized"}]), |_, _| unreachable!()).is_none());
+        // Empty batch is an invalid request.
+        assert_eq!(ask(json!([]), |_, _| unreachable!()).unwrap()["error"]["code"], -32600);
+    }
+
+    #[test]
+    fn a_request_with_an_id_but_no_method_is_invalid_not_silently_dropped() {
+        let r = ask(json!({"jsonrpc":"2.0","id":7}), |_, _| unreachable!()).unwrap();
+        assert_eq!((r["id"].clone(), r["error"]["code"].clone()), (json!(7), json!(-32600)));
+        let r = ask(json!({"jsonrpc":"2.0","id":8,"method":5}), |_, _| unreachable!()).unwrap();
+        assert_eq!(r["error"]["code"], -32600);
+        assert_eq!(r["id"], 8);
+        let r = ask(json!(42), |_, _| unreachable!()).unwrap();
+        assert_eq!((r["id"].clone(), r["error"]["code"].clone()), (Value::Null, json!(-32600)));
+        // Responses from the client (we never send requests) and bare notifications-without-method objects.
+        assert!(ask(json!({"jsonrpc":"2.0","id":9,"result":{}}), |_, _| unreachable!()).is_none());
+        // An element of a batch that is malformed gets its own error.
+        let r = ask(json!([1, {"jsonrpc":"2.0","id":2,"method":"ping"}]), |_, _| unreachable!()).unwrap();
+        assert_eq!(r.as_array().unwrap().len(), 2);
+        assert_eq!(r[0]["error"]["code"], -32600);
     }
 }

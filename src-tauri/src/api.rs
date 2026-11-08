@@ -174,7 +174,14 @@ fn list(ctx: &Ctx, p: &Value) -> Out {
             _ => true,
         })
         .take(limit)
-        .map(|i| view(&i, ctx.now))
+        .map(|i| {
+            let mut v = view(&i, ctx.now);
+            // Notes are what the Pro-only `get` is for: a free `list` must not leak them.
+            if !ctx.pro && let Some(o) = v.as_object_mut() {
+                o.remove("notes");
+            }
+            v
+        })
         .collect();
     Ok((json!({ "items": items }), false))
 }
@@ -329,7 +336,7 @@ pub fn parse_when(s: &str, now_ms: i64) -> Option<i64> {
         }
     }
     if let Some(ms) = parse_duration_ms(s) {
-        return Some(now_ms + ms);
+        return now_ms.checked_add(ms);
     }
     let now = Local.timestamp_millis_opt(now_ms).single()?;
     let q = nlp::parse_quick(s, now);
@@ -349,7 +356,7 @@ pub fn parse_duration_ms(s: &str) -> Option<i64> {
         "w" | "week" | "weeks" => 7 * 86_400_000,
         _ => return None,
     };
-    Some(n * mult)
+    n.checked_mul(mult)
 }
 
 fn local_day_bounds(now_ms: i64) -> (i64, i64) {
@@ -715,6 +722,42 @@ mod tests {
         let u = run(&db, true, "update", json!({"id": r["id"], "prealert": null})).unwrap();
         assert!(u["prealertMin"].is_null());
         assert!(run(&db, true, "update", json!({"id": r["id"], "prealert": "7m"})).is_err());
+    }
+
+    #[test]
+    fn free_list_hides_notes_but_pro_list_and_get_show_them() {
+        let db = Db::open_memory().unwrap();
+        let r = run(&db, false, "add", json!({"title": "n", "notes": "secret body"})).unwrap();
+        let free = run(&db, false, "list", json!({})).unwrap();
+        assert!(free["items"][0].get("notes").is_none());
+        assert_eq!(free["items"][0]["title"], "n");
+        // add's own response is the caller's input echoed back; it may keep notes.
+        assert_eq!(r["notes"], "secret body");
+        let pro = run(&db, true, "list", json!({})).unwrap();
+        assert_eq!(pro["items"][0]["notes"], "secret body");
+        assert_eq!(run(&db, true, "get", json!({"id": r["id"]})).unwrap()["notes"], "secret body");
+    }
+
+    #[test]
+    fn hostile_parameters_do_not_panic() {
+        let db = Db::open_memory().unwrap();
+        let big = "9".repeat(40);
+        for due in [big.clone(), format!("{big}h"), format!("{big}d"), "in 1e999 hours".into(), "\u{0}".into(), "٣٣h".into(), "0000-00-00 00:00".into(), "".into()] {
+            let _ = run(&db, true, "add", json!({"title": "x", "due": due}));
+        }
+        let r = run(&db, true, "add", json!({"title": "x"})).unwrap();
+        for until in [big.clone(), format!("{big}m"), "-5h".into(), "😀".into(), "9999999999999999999 weeks".into()] {
+            let _ = run(&db, true, "snooze", json!({"id": r["id"], "until": until}));
+        }
+        for p in [json!(null), json!([]), json!("str"), json!({"id": 5}), json!({"id": ""}), json!({"id": "\u{1F600}"})] {
+            for m in ["get", "complete", "snooze", "update", "delete", "list", "add"] {
+                let req = json!({"id": 1, "method": m, "params": p}).to_string();
+                let _ = handle_line(&Ctx { db: &db, now: NOW, pro: true }, &req);
+            }
+        }
+        for line in ["", "null", "[]", "42", "\"x\"", "{\"method\": 5}", "{\"id\": {}, \"method\": \"list\", \"params\": 7}"] {
+            let _ = handle_line(&Ctx { db: &db, now: NOW, pro: true }, line);
+        }
     }
 
     #[test]

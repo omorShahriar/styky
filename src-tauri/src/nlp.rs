@@ -333,10 +333,10 @@ fn find_date(text: &str, now: DateTime<Local>) -> Option<Found> {
                 let d = now.checked_add_months(Months::new(n as u32))?;
                 d.timestamp_millis()
             }
-            'm' => now_ms + (n * 60_000.0) as i64,
-            'h' => now_ms + (n * 3_600_000.0) as i64,
+            'm' => now_ms.checked_add((n * 60_000.0) as i64)?,
+            'h' => now_ms.checked_add((n * 3_600_000.0) as i64)?,
             'd' => from_naive(today.checked_add_days(Days::new(n as u64))?.and_time(now.time().with_nanosecond(0)?))?,
-            'w' => from_naive(today.checked_add_days(Days::new(7 * n as u64))?.and_time(now.time().with_nanosecond(0)?))?,
+            'w' => from_naive(today.checked_add_days(Days::new((n as u64).saturating_mul(7)))?.and_time(now.time().with_nanosecond(0)?))?,
             _ => return None,
         };
         return Some(Found { ms, start: g.start(), end: g.end() });
@@ -498,6 +498,47 @@ mod tests {
         let q = p("sync every 2 weeks fri 3pm for 4 times");
         assert_eq!((q.title.as_str(), q.repeat.as_str()), ("sync", "FREQ=WEEKLY;INTERVAL=2;COUNT=4"));
         assert_eq!(q.due_at, Some(ms(2026, 3, 13, 15, 0)));
+    }
+
+    /// Arbitrary text arrives from the CLI, MCP clients and any program on the pipe: nothing may panic.
+    #[test]
+    fn odd_input_never_panics() {
+        let fixed = [
+            "", " ", "\n\t", "#", "@", "!", "!!", "!!!", "!!!!", "#@!", "@#", "# #", "@ @ @", "! ! !", "!low", "!LOW!", "every", "every ", "every every",
+            "every 0 days", "every 99999999999999999999 days", "every -3 weeks", "every 367 days", "every mon,", "every ,", "every -", "every mon-", "every mon-mon",
+            "every sun-mon", "last", "last friday", "last friday of", "of the month", "first of the month", "5th", "99th friday of the month", "0th monday of the month",
+            "for 0 times", "for 99999999999999 times", "until", "until until", "until 99999-99-99", "until 2026-13-45", "until \u{0}",
+            "in", "in 5", "in 99999999999999999999999 hours", "in 1e999 days", "in -5 minutes", "in 18446744073709551615 weeks", "in 4294967296 months",
+            "at", "at 99", "at 25:99", "99:99", "13pm", "0am", "12:60pm", "2026-02-30", "0000-00-00", "13/45/99", "3/0", "feb 30", "dec 0", "32 jan",
+            "٣ pm", "at ٥", "２０２６-０３-１１", "every ٢ weeks", "٥ times every day", "٣٣th friday of the month", "https://", "http://\u{0}", "https://a.b/\u{1F600}",
+            "😀", "😀 tomorrow 😀", "#😀", "@😀", "é #é @é !!", "ﬁ ﬂ", "tomorrow\u{200B}5pm", "Ａ", "\u{202E}tomorrow",
+        ];
+        let now = Local.with_ymd_and_hms(2026, 3, 11, 10, 0, 0).unwrap();
+        for s in fixed {
+            let _ = parse_quick(s, now);
+        }
+        // Very long inputs.
+        for unit in ["a", "#", "@", "!", "every ", "tomorrow ", "😀", "1", "in 5 ", "mon,"] {
+            let _ = parse_quick(&unit.repeat(20_000), now);
+        }
+        // Deterministic pseudo-random soup of tokens, digits and multibyte characters.
+        let pieces = [
+            "every", "day", "days", "week", "weeks", "month", "mon", "tue", "wed", "fri", "sun", "last", "first", "2nd", "of", "the", "until", "for", "times", "in", "at",
+            "tomorrow", "today", "next", "noon", "pm", "am", ":", ",", "-", "/", "#", "@", "!", "!!", "!!!", "0", "5", "99", "2026", "٣", "😀", "é", " ", "  ", "\u{200B}",
+            "https://x.y", "1e9", "-1",
+        ];
+        let mut seed: u64 = 0x9E37_79B9_7F4A_7C15;
+        for _ in 0..4000 {
+            let mut s = String::new();
+            for _ in 0..(1 + seed % 12) {
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                s.push_str(pieces[(seed >> 33) as usize % pieces.len()]);
+                if !(seed >> 20).is_multiple_of(3) {
+                    s.push(' ');
+                }
+            }
+            let _ = parse_quick(&s, now);
+        }
     }
 
     #[test]
