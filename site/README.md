@@ -1,7 +1,7 @@
 # Styky website
 
 The landing page for [Styky](https://github.com/omorShahriar/styky): a static Vite + React + TypeScript app, deployed
-to GitHub Pages at `https://omorshahriar.github.io/styky/`.
+to **Cloudflare Pages** at `https://styky.pages.dev/`.
 
 The hero is a **live demo of the real app UI**. `site/` imports `src/app/Panel.tsx`, `src/app/QuickAdd.tsx`, the
 components and `src/lib/nlp.ts` straight from the app (read-only) and replaces everything that talks to Tauri.
@@ -11,9 +11,9 @@ components and `src/lib/nlp.ts` straight from the app (read-only) and replaces e
 ```bash
 cd site
 pnpm install --ignore-workspace   # the site has its own package.json; the repo root is not a workspace
-pnpm dev                          # http://localhost:5173/styky/
+pnpm dev                          # http://localhost:5173/
 pnpm build                        # -> site/dist
-pnpm preview                      # serves dist at http://localhost:4173/styky/
+pnpm preview                      # serves dist at http://localhost:4173/
 pnpm typecheck
 pnpm og                           # regenerate public/og.png (the social card)
 ```
@@ -41,19 +41,37 @@ pnpm og                           # regenerate public/og.png (the social card)
 If the app's UI changes, the demo follows automatically. If a new Tauri command or plugin is used by `Panel` or its
 components, add it to `src/mock/` or the build will fail to resolve it.
 
-## Deploy (GitHub Pages)
+## Deploy (Cloudflare Pages)
 
-`.github/workflows/pages.yml` builds `site/` and deploys it with `actions/deploy-pages`. It runs on pushes to `main`
-that touch `site/**` (or the app UI the demo renders from `src/`), and on demand (Actions -> Deploy website -> Run workflow).
+Cloudflare builds the site from this repo on every push to `main` (and builds a preview URL for other branches).
+No GitHub Actions are involved.
 
-**Enable it once:** repository **Settings -> Pages -> Build and deployment -> Source: GitHub Actions**.
+**One-time setup:** Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git**, then pick
+`omorShahriar/styky` and use these settings:
+
+| Setting | Value |
+|---|---|
+| Project name | `styky` (gives `styky.pages.dev`) |
+| Production branch | `main` |
+| Framework preset | None |
+| Root directory | `site` |
+| Build command | `pnpm build` |
+| Build output directory | `dist` |
+| Environment variables | `NODE_VERSION` = `22`, `PNPM_VERSION` = `10.15.1` |
+
+Cloudflare clones the whole repo, so the demo's read-only imports from `../src` resolve. The site's own dependencies
+cover them; this was checked with a clean clone that had no root `node_modules`. `public/_headers` sets long-lived caching
+for hashed assets.
+
+If the project name `styky` is taken, set the env var `SITE_URL` to the URL Cloudflare gives you (with trailing slash), so
+the canonical and Open Graph tags are right.
 
 ## Set the Lemon Squeezy checkout URL
 
 1. In Lemon Squeezy create the product (one-time payment, license keys on) and copy its checkout URL,
    e.g. `https://YOURSTORE.lemonsqueezy.com/buy/<uuid>`.
-2. Either edit `checkoutUrl` in `src/config.ts`, or (no code change) add a repository **variable**
-   `LS_CHECKOUT_URL` under Settings -> Secrets and variables -> Actions -> Variables, then re-run the workflow.
+2. Either edit `checkoutUrl` in `src/config.ts`, or (no code change) add the Cloudflare Pages environment variable
+   `VITE_LS_CHECKOUT_URL` (Settings → Variables and secrets), then retry the latest deployment.
 3. While the URL still contains `REPLACE_ME`, the Buy button reads **Coming soon**. Once set, it becomes
    *Pre-order for $4.99* and opens the Lemon Squeezy overlay (`lemon.js` is only loaded then).
 
@@ -62,10 +80,10 @@ and `src/sections/Pricing.tsx`. The prices live in `config.ts`.
 
 ## Custom domain later
 
-1. Add the domain under Settings -> Pages -> Custom domain and create the DNS records GitHub shows.
-2. Add repository variables `SITE_BASE` = `/` and `SITE_URL` = `https://your.domain/` (with trailing slash), then re-run
-   the workflow. Both feed the asset base path and the canonical / Open Graph URLs.
-   Locally: `SITE_BASE=/ SITE_URL=https://your.domain/ pnpm build`.
+1. In the Pages project open **Custom domains → Set up a domain**. If the domain's DNS is on Cloudflare, the records are added
+   for you.
+2. Set the environment variable `SITE_URL` = `https://your.domain/` (with trailing slash) and redeploy, so the canonical and
+   Open Graph URLs use it. The base path stays `/`.
 
 ## Files
 

@@ -15,7 +15,7 @@ something is due, and stays out of the way the rest of the time.
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078d4?logo=windows11&logoColor=white)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white)
 
-[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://omorshahriar.github.io/styky/) · [Features](#features) · [Quick add](#quick-add-type-it-like-you-say-it) · [Build from source](#build-from-source)
+[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.pages.dev/) · [Features](#features) · [Quick add](#quick-add-type-it-like-you-say-it) · [Build from source](#build-from-source)
 
 </div>
 

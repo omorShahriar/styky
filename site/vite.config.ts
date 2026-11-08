@@ -7,10 +7,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const appSrc = path.resolve(here, "../src");
 const mock = (file: string) => path.resolve(here, "src/mock", file);
 
-/** Public base path. "/styky/" for GitHub Pages; set SITE_BASE=/ for a custom domain. */
-const base = process.env.SITE_BASE || "/styky/";
+/** Public base path. "/" on Cloudflare Pages (styky.pages.dev or a custom domain); "/styky/" only for GitHub Pages. */
+const base = process.env.SITE_BASE || "/";
 /** Absolute site URL, used for canonical / OG tags. */
-const siteUrl = (process.env.SITE_URL || "https://omorshahriar.github.io/styky/").replace(/\/?$/, "/");
+const siteUrl = (process.env.SITE_URL || "https://styky.pages.dev/").replace(/\/?$/, "/");
 
 /** The app's real `src/lib/api.ts` (Tauri invoke wrappers) is swapped for the in-memory mock. */
 function mockApi(): Plugin {
