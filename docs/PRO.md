@@ -24,9 +24,10 @@ that adds power features on top. Nothing that is free today becomes paid. Sold t
 ## Licensing (decisions)
 
 - `src-tauri/src/license.rs`, endpoints `POST https://api.lemonsqueezy.com/v1/licenses/{activate,validate,deactivate}` (form body,
-  no auth). Activation `instance_name` = `<PC name> Styky`.
+  no auth). Activation `instance_name` = `Styky <8 random hex chars>` (a per-install id in `settings.install_id`, never exported; the PC and user name are not sent, see `docs/PRIVACY.md`).
 - Cached in the SQLite table `license` (`key`, `instance_id`, `validated_at`, `customer`), deliberately **not** in `settings`, so
   Export never carries the key.
+- Only a real verdict revokes: HTTP 200/400/404/422 **and** `valid`/`activated` = false (or `license_key.status` expired/disabled). A proxy/WAF/captive-portal 401/403, `{}`, an error envelope, 5xx or 429 is "unavailable" and changes nothing. Writes after a request are conditional on the same key + instance (a Remove or a new activation during the request is never undone), and replaced/wrong-product activations are released best effort.
 - State machine (all unit-tested with a mocked HTTP layer): `validated_at` within 30 days ⇒ Pro; re-check when older than 7 days
   (at start and every 6 h); `valid:false` / `disabled` / `expired` / unknown key or instance ⇒ the entitlement is deleted;
   offline, timeout, 5xx, 429 or garbage ⇒ nothing changes. After 30 days without a successful check Pro pauses (state
@@ -45,9 +46,9 @@ that adds power features on top. Nothing that is free today becomes paid. Sold t
 ### 1. Local API, CLI and AI connectors
 - **Local API:** named pipe `\\.\pipe\styky-<username>`, newline-delimited JSON (`{"id","method","params"}` →
   `{"id","result"|"error":{"code","message"}}`), created with an ACL that grants only the current user, remote clients rejected and
-  `first_pipe_instance` so another process cannot squat the name. Methods `add`, `list`, `get`, `complete`, `snooze`, `update`,
+  `first_pipe_instance` so another process cannot squat the name; the server keeps retrying with backoff (and reports "Local API unavailable" in Connect AI) instead of dying, and every client checks that the pipe's server process runs as the same Windows user before sending anything. Methods `add`, `list`, `get`, `complete`, `snooze`, `update`,
   `delete`.
-- **Tiering:** **Free:** `add`, `list` (including the due-today / overdue / tag / open-done filters). **Pro:** `get`, `complete`,
+- **Tiering:** **Free:** `add`, `list` (including the due-today / overdue / tag / open-done filters; the free `list` omits `notes`, which the Pro `get` returns). **Pro:** `get`, `complete`,
   `snooze`, `update`, `delete`; the app answers with the error code `requires_pro` and a plain message. (Deviation from the first
   draft, which listed "filters" as Pro: filters are part of `list`, which stays free.)
 - **`add` takes natural language** and also structured fields (`title`, `due`, `tag`, `priority`, `repeat`, `notes`, `link`,
