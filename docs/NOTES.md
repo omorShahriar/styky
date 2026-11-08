@@ -185,7 +185,7 @@ Deviations / decisions:
   failure is kept in `quickadd::STARTUP_ERROR` and surfaced via `quickadd_hotkey_error` so Settings shows it too. Known quirk: pressing the
   currently registered combo while recording triggers quick-add instead.
 - **Updater**: `tauri-plugin-updater` + `tauri-plugin-process`, key at `%USERPROFILE%\.tauri\styky.key` (generated with an empty password;
-  outside the repo, `*.key` is also git-ignored), public key in `tauri.conf.json`, endpoint placeholder `https://github.com/OWNER/REPO/...`.
+  outside the repo, `*.key` is also git-ignored), public key in `tauri.conf.json`, endpoint `https://github.com/omorShahriar/styky/releases/latest/download/latest.json` (see docs/RELEASING.md).
   A failed check shows a friendly message. `scripts/build.ps1` loads the key into `TAURI_SIGNING_PRIVATE_KEY` and runs `pnpm tauri build`.
 - **Icon**: `assets/icon.svg` (sticky note, folded corner) -> `pnpm tauri icon assets/icon.svg`; the tray uses the same app icon. The generated
   `android/` and `ios/` icon folders were deleted. Bundle `targets` is `["nsis"]` only.

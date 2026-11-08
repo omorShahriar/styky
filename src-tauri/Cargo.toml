@@ -2,7 +2,9 @@
 name = "styky"
 version = "0.1.0"
 description = "Styky - always-visible work reminders"
-authors = ["Styky"]
+authors = ["Omor Shahriar"]
+license = "MIT"
+repository = "https://github.com/omorShahriar/styky"
 edition = "2024"
 
 [lib]

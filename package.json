@@ -1,6 +1,8 @@
 {
   "name": "styky",
   "private": true,
+  "license": "MIT",
+  "repository": "github:omorShahriar/styky",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
