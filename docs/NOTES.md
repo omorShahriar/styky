@@ -259,7 +259,17 @@ The TS twins (`lib/rrule.ts`, `lib/nlpRepeat.ts`) share their test cases with th
 custom properties / `data-skin` / `data-density` on `<html>`; tokens in `styles/tokens.css`.
 
 **Verified live** (`tauri dev --config {identifier: com.styky.dev}` with `STYKY_PRO_DEV=1`, own data dir because the installed v0.1.0 was running and owns `com.styky.app`):
-see the final report for the list. **Not verified**: a real Lemon Squeezy key (no store yet); the installed NSIS PATH behaviour is covered in the report if it was run.
+verified: Pro card in both states (forced-on, and free with locked controls + Pro pills); a bogus key against the real Lemon Squeezy API returns "license_key not found." (rejection path and
+parsing are right); `styky add/ls/done` against the running app, including the free-tier `requires Styky Pro` error (exit code 3); a 15 s-due Critical item re-notified on its 60 s
+interval and a 5-minute pre-alert fired exactly once at due-5min (`last_nag_at`/`pre_fired_at` in the DB); custom repeat builder (every 2 weeks on Fri) saves and `complete` moves it +14 days
+keeping 17:00; Sticky skin / compact / large font / opacity render. In some runs a human clicked "Done" on the live toast (item became `done` seconds after it appeared), which also shows the
+Done activation works from a dev-build toast.
+**Installer** (`scripts/build.ps1`, release, 3 min): `Styky_0.1.0_x64-setup.exe` contains `bin\styky.exe` (379 KB, runs standalone: `--version`, "Styky isn't running" exit 2) and
+`bin\styky-path.ps1`; the generated `installer.nsi` calls the hooks (POSTINSTALL after install, PREUNINSTALL before anything is deleted) and the uninstall section deletes `bin\*`.
+`styky-path.ps1` was exercised against a scratch registry key (add / idempotent re-add / remove, 300-entry PATH, REG_EXPAND_SZ kept). **Not run end-to-end:** actually installing and
+uninstalling, because the installer would overwrite the owner's running v0.1.0 install (same identifier, same install dir, same uninstall key). Do that on a clean VM / second account.
+The bundler also copies `styky-cli.exe` next to `styky.exe` (harmless duplicate, removed on uninstall).
+**Not verified**: a real Lemon Squeezy key (no store yet); a live toast screenshot; light theme for the new UI; the MSIX build (still compiles: `cargo check --features store`).
 
 ## Handoff updates (Pro v1)
 
