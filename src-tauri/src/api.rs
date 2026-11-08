@@ -20,6 +20,19 @@ pub struct Ctx<'a> {
 
 type Out = Result<(Value, bool), ApiError>;
 
+/// Why the local API is not serving (shown in Settings → Connect AI); `None` while it is healthy.
+#[derive(Default)]
+pub struct ApiStatus(std::sync::Mutex<Option<String>>);
+
+impl ApiStatus {
+    pub fn set(&self, e: Option<String>) {
+        *self.0.lock().unwrap_or_else(|p| p.into_inner()) = e;
+    }
+    pub fn error(&self) -> Option<String> {
+        self.0.lock().unwrap_or_else(|p| p.into_inner()).clone()
+    }
+}
+
 pub const REQUIRES_PRO: &str = "requires_pro";
 
 fn requires_pro(method: &str) -> ApiError {
@@ -485,14 +498,57 @@ mod server {
     }
 
     /// Accept connections on `name` until the process ends. Each connection may send many request lines.
-    pub async fn serve(name: String, handler: Handler) -> Result<(), String> {
-        let acl = Arc::new(PipeAcl::for_current_user()?);
-        // `first_pipe_instance`: fail instead of joining a pipe another process created under our name.
-        let mut server = acl.create(&name, true).map_err(|e| format!("cannot create {name}: {e}"))?;
+    ///
+    /// Never gives up: a failed create or connect (a client that vanished early gives ERROR_NO_DATA, another
+    /// process squatting the name, resource errors) is recorded in `status`, retried with a short backoff and
+    /// the loop continues, so one bad moment cannot disable the API until the next app start.
+    pub async fn serve(name: String, handler: Handler, status: Arc<super::ApiStatus>) -> Result<(), String> {
+        let acl = match PipeAcl::for_current_user() {
+            Ok(a) => Arc::new(a),
+            Err(e) => {
+                // Deterministic failure: retrying cannot help.
+                status.set(Some(format!("cannot build the pipe's access list: {e}")));
+                return Err(e);
+            }
+        };
+        let mut first = true; // `first_pipe_instance`: fail instead of joining a pipe another process created under our name
+        let mut next: Option<NamedPipeServer> = None;
+        let mut backoff = std::time::Duration::from_millis(100);
         loop {
-            server.connect().await.map_err(|e| e.to_string())?;
+            let server = match next.take() {
+                Some(s) => s,
+                None => match acl.create(&name, first) {
+                    Ok(s) => {
+                        first = false;
+                        backoff = std::time::Duration::from_millis(100);
+                        status.set(None);
+                        s
+                    }
+                    Err(e) => {
+                        let msg = format!("cannot create {name}: {e}");
+                        eprintln!("styky: local API: {msg}");
+                        status.set(Some(msg));
+                        tokio::time::sleep(backoff).await;
+                        backoff = (backoff * 2).min(std::time::Duration::from_secs(5));
+                        continue;
+                    }
+                },
+            };
+            if let Err(e) = server.connect().await {
+                // ERROR_NO_DATA (232) / broken pipe: the client went away before we could accept. Normal.
+                eprintln!("styky: local API connect: {e}");
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                continue;
+            }
+            // Prepare the next instance before serving this one, so there is always a listener.
+            match acl.create(&name, false) {
+                Ok(s) => next = Some(s),
+                Err(e) => {
+                    eprintln!("styky: local API: cannot create the next pipe instance: {e}");
+                    status.set(Some(format!("cannot create {name}: {e}")));
+                }
+            }
             let conn = server;
-            server = acl.create(&name, false).map_err(|e| format!("cannot create {name}: {e}"))?;
             let h = handler.clone();
             tokio::spawn(async move {
                 let (r, mut w) = tokio::io::split(conn);
@@ -541,7 +597,7 @@ mod server {
             let name = format!(r"\\.\pipe\styky-test-{}", std::process::id());
             let h: Handler = Arc::new(|line| format!(r#"{{"id":1,"result":{{"echo":{}}}}}"#, serde_json::to_string(line).unwrap()));
             let n = name.clone();
-            tokio::spawn(async move { serve(n, h).await });
+            tokio::spawn(async move { serve(n, h, Arc::new(crate::api::ApiStatus::default())).await });
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             let n = name.clone();
             let r = tokio::task::spawn_blocking(move || proto::call_on(&n, "ping", json!({"a": 1}))).await.unwrap().unwrap();
@@ -549,6 +605,48 @@ mod server {
             // A second connection works too (the next instance was created).
             let r2 = tokio::task::spawn_blocking(move || proto::call_on(&name, "ping", json!({}))).await.unwrap();
             assert!(r2.is_ok());
+        }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn clients_that_vanish_do_not_stop_the_server() {
+            let name = format!(r"\\.\pipe\styky-test-vanish-{}", std::process::id());
+            let h: Handler = Arc::new(|_| r#"{"id":1,"result":"ok"}"#.to_string());
+            let n = name.clone();
+            let status = Arc::new(crate::api::ApiStatus::default());
+            tokio::spawn(async move { serve(n, h, status).await });
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            // Connect and drop at once, many times (each leaves the server with a half-open instance).
+            let n = name.clone();
+            tokio::task::spawn_blocking(move || {
+                for _ in 0..40 {
+                    drop(std::fs::OpenOptions::new().read(true).write(true).open(&n));
+                }
+            })
+            .await
+            .unwrap();
+            let n = name.clone();
+            let r = tokio::task::spawn_blocking(move || proto::call_on(&n, "ping", json!({}))).await.unwrap();
+            assert_eq!(r.unwrap(), json!("ok"));
+        }
+
+        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+        async fn a_squatted_pipe_name_is_reported_and_recovered_from() {
+            let name = format!(r"\\.\pipe\styky-test-squat-{}", std::process::id());
+            // Someone else creates the name first.
+            let squatter = ServerOptions::new().first_pipe_instance(true).create(&name).unwrap();
+            let h: Handler = Arc::new(|_| r#"{"id":1,"result":"ok"}"#.to_string());
+            let status = Arc::new(crate::api::ApiStatus::default());
+            let (n, st) = (name.clone(), status.clone());
+            tokio::spawn(async move { serve(n, h, st).await });
+            tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+            assert!(status.error().unwrap_or_default().contains("cannot create"), "{:?}", status.error());
+            // The squatter goes away: the server takes the name over on its own and the error clears.
+            drop(squatter);
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            assert_eq!(status.error(), None);
+            let n = name.clone();
+            let r = tokio::task::spawn_blocking(move || proto::call_on(&n, "ping", json!({}))).await.unwrap();
+            assert_eq!(r.unwrap(), json!("ok"));
         }
 
         #[test]

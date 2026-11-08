@@ -248,6 +248,12 @@ pub fn open_settings_pro(app: AppHandle) {
     let _ = app.emit_to(crate::settings_win::LABEL, "open-pro-card", ());
 }
 
+/// Why the local API (CLI / MCP) is not serving, or None when it is fine (shown in Settings → Connect AI).
+#[tauri::command]
+pub fn api_status(status: State<std::sync::Arc<crate::api::ApiStatus>>) -> Option<String> {
+    status.error()
+}
+
 /// Why the saved quick-add hotkey is not active (None when it is registered).
 #[tauri::command]
 pub fn quickadd_hotkey_error() -> Option<String> {

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../lib/api";
 import { ProPill } from "../components/ProPill";
 import { usePro } from "../lib/pro";
 
@@ -53,6 +54,14 @@ export function ConnectAI() {
   const pro = usePro();
   const [copied, setCopied] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const check = () => void api.apiStatus().then(setApiError).catch(() => {});
+    check();
+    window.addEventListener("focus", check);
+    return () => window.removeEventListener("focus", check);
+  }, []);
 
   const onCopy = async (s: Snippet) => {
     const ok = await copy(s.code);
@@ -70,6 +79,11 @@ export function ConnectAI() {
             Let Claude (or any MCP client) add and read your reminders: &ldquo;remind me to rotate the keys Friday&rdquo;. The connector is the{" "}
             <code>styky</code> command that installs with the app; Styky must be running.
           </p>
+          {apiError && (
+            <p className="inline-error" role="alert">
+              Local API unavailable: {apiError}. The styky command and MCP connectors cannot reach Styky until this is fixed (another program may be using the Styky pipe; restart Styky or that program).
+            </p>
+          )}
           {SNIPPETS.map((s) => (
             <div className="snippet" key={s.id}>
               <div className="snippet-head">

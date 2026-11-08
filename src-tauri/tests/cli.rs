@@ -31,7 +31,7 @@ async fn harness(tag: &str, pro: bool) -> Harness {
     });
     let name = format!(r"\\.\pipe\styky-{user}");
     tokio::spawn(async move {
-        if let Err(e) = api::serve(name, handler).await {
+        if let Err(e) = api::serve(name, handler, Arc::new(api::ApiStatus::default())).await {
             eprintln!("serve failed: {e}");
         }
     });

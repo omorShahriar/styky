@@ -67,6 +67,7 @@ pub fn run() {
             commands::quickadd_hotkey_error,
             commands::open_settings,
             commands::open_settings_pro,
+            commands::api_status,
             commands::list_items,
             commands::create_item,
             commands::update_item,
@@ -117,6 +118,7 @@ pub fn run() {
             quickadd::init(&handle);
             scheduler::spawn(handle.clone());
             spawn_license_check(handle.clone());
+            app.manage(std::sync::Arc::new(api::ApiStatus::default()));
             spawn_api(handle.clone());
             Ok(())
         })
@@ -184,7 +186,8 @@ fn spawn_api(app: tauri::AppHandle) {
             }
             out
         });
-        if let Err(e) = api::serve(proto::pipe_name(), handler).await {
+        let status = app.state::<std::sync::Arc<api::ApiStatus>>().inner().clone();
+        if let Err(e) = api::serve(proto::pipe_name(), handler, status).await {
             eprintln!("styky: local API is not available: {e}");
         }
     });

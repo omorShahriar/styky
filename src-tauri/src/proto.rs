@@ -60,6 +60,14 @@ pub fn call_on(name: &str, method: &str, params: Value) -> Result<Value, ApiErro
             Err(e) => return Err(ApiError::new("io", format!("cannot reach Styky: {e}"))),
         }
     };
+    // The pipe name is predictable and machine-wide: before sending anything, make sure the process that created
+    // it runs as *us*. (The server also refuses other users through the pipe's ACL; this protects the client.)
+    if !server_is_current_user(&pipe) {
+        return Err(ApiError::new(
+            "untrusted_server",
+            "Refusing to talk to the Styky pipe: the process behind it is not running as your Windows user.",
+        ));
+    }
     let io = |e: std::io::Error| ApiError::new("io", format!("connection to Styky failed: {e}"));
     let mut w = &pipe;
     let req = json!({ "id": 1, "method": method, "params": params });
@@ -85,4 +93,73 @@ pub fn call_on(_name: &str, _method: &str, _params: Value) -> Result<Value, ApiE
 /// Call the running app's API.
 pub fn call(method: &str, params: Value) -> Result<Value, ApiError> {
     call_on(&pipe_name(), method, params)
+}
+
+/// Is the process serving this pipe handle running as the same user as we are? Fails closed.
+#[cfg(windows)]
+pub fn server_is_current_user(pipe: &std::fs::File) -> bool {
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::Pipes::GetNamedPipeServerProcessId;
+    let mut pid = 0u32;
+    // SAFETY: the handle is a valid open pipe for the lifetime of the call.
+    let ok = unsafe { GetNamedPipeServerProcessId(HANDLE(pipe.as_raw_handle()), &mut pid) }.is_ok();
+    ok && pid_runs_as_current_user(pid)
+}
+
+/// Compare the token user SID of process `pid` with ours. Any failure (no access, gone) is "no".
+#[cfg(windows)]
+pub fn pid_runs_as_current_user(pid: u32) -> bool {
+    use windows::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows::Win32::Security::{EqualSid, GetTokenInformation, TOKEN_QUERY, TOKEN_USER, TokenUser};
+    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION};
+
+    /// TOKEN_USER bytes (the SID lives inside the same buffer).
+    unsafe fn token_user(token: HANDLE) -> Option<Vec<u8>> {
+        let mut len = 0u32;
+        let _ = unsafe { GetTokenInformation(token, TokenUser, None, 0, &mut len) };
+        if len == 0 {
+            return None;
+        }
+        let mut buf = vec![0u8; len as usize];
+        unsafe { GetTokenInformation(token, TokenUser, Some(buf.as_mut_ptr().cast()), len, &mut len) }.ok()?;
+        Some(buf)
+    }
+
+    unsafe {
+        let mut mine = HANDLE::default();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut mine).is_err() {
+            return false;
+        }
+        let me = token_user(mine);
+        let _ = CloseHandle(mine);
+        let Some(me) = me else { return false };
+
+        let Ok(proc) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else { return false };
+        let mut theirs = HANDLE::default();
+        let opened = OpenProcessToken(proc, TOKEN_QUERY, &mut theirs).is_ok();
+        let _ = CloseHandle(proc);
+        if !opened {
+            return false;
+        }
+        let other = token_user(theirs);
+        let _ = CloseHandle(theirs);
+        let Some(other) = other else { return false };
+        let (a, b) = (&*(me.as_ptr() as *const TOKEN_USER), &*(other.as_ptr() as *const TOKEN_USER));
+        EqualSid(a.User.Sid, b.User.Sid).is_ok()
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn our_own_process_is_us_and_system_is_not() {
+        assert!(pid_runs_as_current_user(std::process::id()));
+        // PID 4 is the NT kernel "System" process (SYSTEM account); a normal user cannot even open it, and either way it is refused.
+        assert!(!pid_runs_as_current_user(4));
+        // A pid that does not exist.
+        assert!(!pid_runs_as_current_user(0xFFFF_FFF0));
+    }
 }
