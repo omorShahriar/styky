@@ -11,13 +11,23 @@
 //! just above Progman. A tiny watcher thread re-evaluates this a few times a
 //! second, because Windows gives us no event for Win+D.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+
+/// Set while one of our own topmost windows (quick-add, settings, ...) is up.
+static SUSPENDED: AtomicBool = AtomicBool::new(false);
+
+/// Pause/resume the Show-Desktop watcher so it never fights our other windows.
+#[allow(dead_code)]
+pub fn suspend(on: bool) {
+    SUSPENDED.store(on, Ordering::SeqCst);
+}
 
 use tauri::{AppHandle, Manager, WebviewWindow};
 use windows::Win32::Foundation::{HWND, LPARAM, RECT};
 use windows::Win32::Graphics::Dwm::{DWMWA_CLOAKED, DwmGetWindowAttribute};
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, FindWindowW, GW_HWNDPREV, GW_OWNER, GWL_EXSTYLE, GetClassNameW, GetWindow,
+    EnumWindows, FindWindowW, GW_HWNDNEXT, GW_HWNDPREV, GW_OWNER, GWL_EXSTYLE, GetClassNameW, GetWindow,
     GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowThreadProcessId, HWND_BOTTOM,
     HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, IsWindowVisible, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos,
     WS_EX_TOOLWINDOW,
@@ -129,6 +139,30 @@ fn settle_hwnd(hwnd: HWND, apps_visible: bool) {
     }
 }
 
+/// True if `hwnd` is stacked above the desktop window (Progman).
+fn above_desktop(hwnd: HWND) -> bool {
+    // SAFETY: plain Win32 calls on window handles.
+    unsafe {
+        let mut cur = hwnd;
+        // Walk down the z-order from the panel; if we meet Progman we are above it.
+        for _ in 0..2000 {
+            match GetWindow(cur, GW_HWNDNEXT) {
+                Ok(next) if !next.is_invalid() => {
+                    let mut class = [0u16; 16];
+                    let n = windows::Win32::UI::WindowsAndMessaging::GetClassNameW(next, &mut class)
+                        as usize;
+                    if String::from_utf16_lossy(&class[..n]) == "Progman" {
+                        return true;
+                    }
+                    cur = next;
+                }
+                _ => return false,
+            }
+        }
+        false
+    }
+}
+
 /// Watch for "Show Desktop" and keep the panel visible through it.
 pub fn spawn_watcher(app: AppHandle) {
     std::thread::spawn(move || {
@@ -138,18 +172,19 @@ pub fn spawn_watcher(app: AppHandle) {
             let Some(win) = app.get_webview_window(crate::window::MAIN) else {
                 continue;
             };
-            if !win.is_visible().unwrap_or(false) {
+            if SUSPENDED.load(Ordering::SeqCst) || !win.is_visible().unwrap_or(false) {
                 continue;
             }
             let apps = app_window_visible();
             let changed = last != Some(apps);
             last = Some(apps);
-            // While the desktop is showing, keep re-asserting: the shell raises
-            // the desktop a moment *after* the windows minimise.
-            if (changed || !apps)
-                && let Ok(hwnd) = win.hwnd()
-            {
-                settle_hwnd(HWND(hwnd.0), apps);
+            // While the desktop is showing, re-assert only if the shell raised
+            // the desktop above us (it does so a moment *after* windows minimise).
+            if let Ok(hwnd) = win.hwnd() {
+                let hwnd = HWND(hwnd.0);
+                if changed || (!apps && !above_desktop(hwnd)) {
+                    settle_hwnd(hwnd, apps);
+                }
             }
         }
     });
