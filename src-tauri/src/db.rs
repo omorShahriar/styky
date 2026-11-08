@@ -8,7 +8,7 @@ use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use crate::model::{
     ExportFile, ImportResult, Item, ItemEdit, PRIORITY_CRITICAL, PRIORITY_LOW, clean_opt,
-    normalize_repeat,
+    normalize_prealert, normalize_repeat,
 };
 use crate::license::Entitlement;
 use crate::{repeat, sort};
@@ -20,11 +20,14 @@ fn err<E: std::fmt::Display>(e: E) -> String {
 }
 
 /// Default settings; stored values override them.
-pub const DEFAULT_SETTINGS: [(&str, &str); 4] = [
+pub const DEFAULT_SETTINGS: [(&str, &str); 6] = [
     ("autoclear_days", "7"),
     ("quickadd_hotkey", "Ctrl+Alt+N"),
     ("theme", "system"),
     ("default_snooze", "10m"),
+    // Pro: minutes between Critical re-notifications, and whether a re-notification raises the panel.
+    ("escalation_minutes", "10"),
+    ("escalation_bring_forward", "0"),
 ];
 
 const SCHEMA_V1: &str = "
@@ -60,8 +63,13 @@ const SCHEMA_V3: &str = "CREATE TABLE license (
   customer TEXT
 );";
 
+/// Pre-alerts and Critical escalation (Pro).
+const SCHEMA_V4: &str = "ALTER TABLE items ADD COLUMN prealert_min INTEGER;
+   ALTER TABLE items ADD COLUMN pre_fired_at INTEGER;
+   ALTER TABLE items ADD COLUMN last_nag_at INTEGER;";
+
 const COLS: &str = "id, title, body_md, due_at, repeat, priority, tag, link, branch, status, \
-                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day";
+                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day, \n                    prealert_min, pre_fired_at, last_nag_at";
 
 fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
     Ok(Item {
@@ -82,13 +90,16 @@ fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
         created_at: r.get(14)?,
         updated_at: r.get(15)?,
         repeat_anchor_day: r.get(16)?,
+        prealert_min: r.get(17)?,
+        pre_fired_at: r.get(18)?,
+        last_nag_at: r.get(19)?,
     })
 }
 
 fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
     conn.execute(
         &format!(
-            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)"
+            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)"
         ),
         params![
             i.id,
@@ -107,7 +118,10 @@ fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
             i.sort_order,
             i.created_at,
             i.updated_at,
-            i.repeat_anchor_day
+            i.repeat_anchor_day,
+            i.prealert_min,
+            i.pre_fired_at,
+            i.last_nag_at
         ],
     )?;
     Ok(())
@@ -149,6 +163,10 @@ impl Db {
         .ok_or_else(|| format!("item {id} not found"))
     }
 
+    pub fn get_item(&self, id: &str) -> Res<Item> {
+        Self::get(&self.conn(), id)
+    }
+
     /// All items in display order (open first, then completed).
     pub fn list(&self, now: i64) -> Res<Vec<Item>> {
         let conn = self.conn();
@@ -174,6 +192,24 @@ impl Db {
             .map_err(err)?
             .collect::<Result<Vec<_>, _>>()
             .map_err(err)
+    }
+
+    /// Record that these items' pre-alert fired.
+    pub fn mark_pre_fired(&self, ids: &[String], now: i64) -> Res<()> {
+        let conn = self.conn();
+        for id in ids {
+            conn.execute("UPDATE items SET pre_fired_at = ?1 WHERE id = ?2", params![now, id]).map_err(err)?;
+        }
+        Ok(())
+    }
+
+    /// Record that these Critical items re-notified.
+    pub fn mark_nagged(&self, ids: &[String], now: i64) -> Res<()> {
+        let conn = self.conn();
+        for id in ids {
+            conn.execute("UPDATE items SET last_nag_at = ?1 WHERE id = ?2", params![now, id]).map_err(err)?;
+        }
+        Ok(())
     }
 
     /// Record that these items have fired (does not touch `updated_at`).
@@ -209,6 +245,9 @@ impl Db {
             created_at: now,
             updated_at: now,
             repeat_anchor_day: None,
+            prealert_min: normalize_prealert(edit.prealert_min),
+            pre_fired_at: None,
+            last_nag_at: None,
         };
         let mut item = item;
         item.repeat_anchor_day = anchor_for(&item.repeat, item.due_at);
@@ -225,6 +264,13 @@ impl Db {
             // A new due time re-arms the reminder.
             item.snoozed_until = None;
             item.last_fired_at = None;
+            item.pre_fired_at = None;
+            item.last_nag_at = None;
+        }
+        let prealert = normalize_prealert(edit.prealert_min);
+        if item.prealert_min != prealert {
+            item.pre_fired_at = None;
+            item.prealert_min = prealert;
         }
         item.title = edit.title.trim().to_string();
         item.body_md = edit.body_md.clone();
@@ -266,6 +312,8 @@ impl Db {
                 item.due_at = Some(next_due);
                 item.snoozed_until = None;
                 item.last_fired_at = None;
+                item.pre_fired_at = None;
+                item.last_nag_at = None;
             }
             None => {
                 item.status = "done".into();
@@ -292,6 +340,7 @@ impl Db {
         let mut item = Self::get(&conn, id)?;
         item.snoozed_until = Some(until);
         item.last_fired_at = None;
+        item.last_nag_at = None;
         item.updated_at = now;
         upsert(&conn, &item).map_err(err)?;
         Ok(item)
@@ -478,6 +527,10 @@ fn migrate(conn: &Connection) -> Res<()> {
         conn.execute_batch(&format!("BEGIN; {SCHEMA_V3} PRAGMA user_version = 3; COMMIT;"))
             .map_err(err)?;
     }
+    if version < 4 {
+        conn.execute_batch(&format!("BEGIN; {SCHEMA_V4} PRAGMA user_version = 4; COMMIT;"))
+            .map_err(err)?;
+    }
     Ok(())
 }
 
@@ -660,5 +713,81 @@ mod tests {
         conn.execute("INSERT INTO items (id,title,sort_order,created_at,updated_at) VALUES ('a', 't', 1, 1, 1)", []).unwrap();
         let db = Db::init(conn).unwrap();
         assert_eq!(db.list(0).unwrap()[0].repeat_anchor_day, None);
+    }
+
+    #[test]
+    fn migrates_a_v2_database_to_the_current_schema_keeping_items() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(&format!("{SCHEMA_V1} {SCHEMA_V2} PRAGMA user_version = 2;")).unwrap();
+        conn.execute(
+            "INSERT INTO items (id, title, sort_order, created_at, updated_at, due_at) VALUES ('a', 'old', 1, 1, 1, 5000)",
+            [],
+        )
+        .unwrap();
+        let db = Db::init(conn).unwrap();
+        let items = db.list(0).unwrap();
+        assert_eq!((items[0].title.as_str(), items[0].prealert_min, items[0].last_nag_at), ("old", None, None));
+        assert_eq!(db.license_get().unwrap(), None);
+        let v: i64 = db.conn().pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
+        assert_eq!(v, 4);
+    }
+
+    #[test]
+    fn prealert_and_nag_markers_re_arm_with_the_item() {
+        let db = Db::open_memory().unwrap();
+        let mut e = edit("x");
+        e.due_at = Some(100_000);
+        e.prealert_min = Some(15);
+        e.priority = 3;
+        let it = db.create(&e, 1).unwrap();
+        assert_eq!((it.prealert_min, it.priority), (Some(15), 3));
+        // Unsupported lengths are dropped.
+        let mut bad = edit("y");
+        bad.prealert_min = Some(7);
+        assert_eq!(db.create(&bad, 1).unwrap().prealert_min, None);
+
+        db.mark_pre_fired(std::slice::from_ref(&it.id), 50).unwrap();
+        db.mark_nagged(std::slice::from_ref(&it.id), 60).unwrap();
+        let got = &db.list(0).unwrap().into_iter().find(|i| i.id == it.id).unwrap();
+        assert_eq!((got.pre_fired_at, got.last_nag_at), (Some(50), Some(60)));
+        // Snooze keeps pre_fired but clears the nag clock.
+        let s = db.snooze(&it.id, 90_000, 2).unwrap();
+        assert_eq!((s.pre_fired_at, s.last_nag_at), (Some(50), None));
+        // Changing the pre-alert length re-arms it; changing the due time re-arms everything.
+        e.prealert_min = Some(30);
+        assert_eq!(db.update(&it.id, &e, 3).unwrap().pre_fired_at, None);
+        db.mark_pre_fired(std::slice::from_ref(&it.id), 70).unwrap();
+        e.due_at = Some(500_000);
+        let u = db.update(&it.id, &e, 4).unwrap();
+        assert_eq!((u.pre_fired_at, u.last_nag_at, u.last_fired_at), (None, None, None));
+        // Completing a repeating item re-arms for the next occurrence.
+        e.repeat = "daily".into();
+        db.update(&it.id, &e, 5).unwrap();
+        db.mark_pre_fired(std::slice::from_ref(&it.id), 80).unwrap();
+        let c = db.complete(&it.id, 6).unwrap();
+        assert_eq!(c.pre_fired_at, None);
+    }
+
+    #[test]
+    fn gate_edit_keeps_pro_fields_out_of_free_builds() {
+        use crate::model::gate_edit;
+        let mut e = edit("x");
+        e.priority = 3;
+        e.prealert_min = Some(15);
+        gate_edit(&mut e, None, false);
+        assert_eq!((e.priority, e.prealert_min), (2, None));
+        // An item that is already critical / has a pre-alert keeps them through unrelated edits.
+        let mut existing = Item::blank("i");
+        existing.priority = 3;
+        existing.prealert_min = Some(30);
+        let mut e = edit("x");
+        e.priority = 3;
+        e.prealert_min = Some(5);
+        gate_edit(&mut e, Some(&existing), false);
+        assert_eq!((e.priority, e.prealert_min), (3, Some(30)));
+        let mut e = edit("x");
+        e.priority = 3;
+        gate_edit(&mut e, None, true);
+        assert_eq!(e.priority, 3);
     }
 }

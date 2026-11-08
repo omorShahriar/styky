@@ -6,6 +6,8 @@ import { api } from "../lib/api";
 import { fromLocalInput, toLocalInput } from "../lib/time";
 import type { ItemEdit, Priority, Repeat } from "../lib/types";
 import { pressSpring } from "../lib/motion";
+import { usePro } from "../lib/pro";
+import { ProPill } from "./ProPill";
 
 const REPEATS: { value: Repeat; label: string }[] = [
   { value: "none", label: "Never" },
@@ -19,6 +21,16 @@ const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 0, label: "Low" },
   { value: 1, label: "Normal" },
   { value: 2, label: "Urgent" },
+  { value: 3, label: "Critical" },
+];
+
+const PREALERTS: { value: number | null; label: string }[] = [
+  { value: null, label: "None" },
+  { value: 5, label: "5 minutes before" },
+  { value: 15, label: "15 minutes before" },
+  { value: 30, label: "30 minutes before" },
+  { value: 60, label: "1 hour before" },
+  { value: 1440, label: "1 day before" },
 ];
 
 const SAVE_DEBOUNCE_MS = 400;
@@ -43,6 +55,7 @@ interface Props {
 export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: Props) {
   // `initial` is a fresh object each render; keep what editing began with.
   const original = useRef(initial).current;
+  const pro = usePro();
   const [edit, setEdit] = useState<ItemEdit>(original);
   const editRef = useRef(edit);
   const idRef = useRef(itemId);
@@ -199,6 +212,26 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
       </div>
 
       <div className="ed-field">
+        <span className="ed-label">
+          Remind early {!pro && <ProPill />}
+        </span>
+        <select
+          className="ed-input"
+          value={edit.prealertMin ?? ""}
+          disabled={edit.dueAt == null || !pro}
+          title={edit.dueAt == null ? "Set a due time first" : undefined}
+          onChange={(e) => patch({ prealertMin: e.target.value === "" ? null : Number(e.target.value) })}
+          aria-label="Remind early"
+        >
+          {PREALERTS.map((r) => (
+            <option key={r.label} value={r.value ?? ""}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="ed-field">
         <span className="ed-label">Priority</span>
         <div className="segmented" role="radiogroup" aria-label="Priority">
           {PRIORITIES.map((p) => (
@@ -208,12 +241,16 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
               role="radio"
               aria-checked={edit.priority === p.value}
               className={edit.priority === p.value ? "on" : ""}
-              onClick={() => patch({ priority: p.value })}
+              onClick={() => {
+                if (p.value === 3 && !pro) void api.openSettingsPro();
+                else patch({ priority: p.value });
+              }}
             >
               {edit.priority === p.value && (
                 <motion.span layoutId="prio-thumb" className="thumb" transition={pressSpring} />
               )}
               <span className="seg-label">{p.label}</span>
+              {p.value === 3 && !pro && <ProPill />}
             </button>
           ))}
         </div>

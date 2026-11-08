@@ -8,7 +8,7 @@ use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use serde_json::{Value, json};
 
 use crate::db::Db;
-use crate::model::{Item, ItemEdit};
+use crate::model::{Item, ItemEdit, gate_edit};
 use crate::nlp;
 use crate::proto::{ApiError, err_response, ok_response};
 
@@ -113,7 +113,14 @@ fn add(ctx: &Ctx, p: &Value) -> Out {
     if q.title.trim().is_empty() {
         return Err(bad("a title is required (pass \"text\" or \"title\")"));
     }
-    let edit = ItemEdit {
+    let prealert = match p.get("prealert") {
+        Some(v) => parse_prealert(v)?,
+        None => None,
+    };
+    if !ctx.pro && (prealert.is_some() || q.priority >= 3 && p.get("priority").is_some()) {
+        return Err(requires_pro("pre-alerts and Critical priority"));
+    }
+    let mut edit = ItemEdit {
         title: q.title,
         body_md: str_field(p, "notes").unwrap_or("").to_string(),
         due_at: q.due_at,
@@ -122,7 +129,9 @@ fn add(ctx: &Ctx, p: &Value) -> Out {
         tag: q.tag,
         link: q.link,
         branch: q.branch,
+        prealert_min: prealert,
     };
+    gate_edit(&mut edit, None, ctx.pro);
     let item = ctx.db.create(&edit, ctx.now).map_err(internal)?;
     Ok((view(&item, ctx.now), true))
 }
@@ -179,7 +188,11 @@ fn update(ctx: &Ctx, p: &Value) -> Out {
         tag: item.tag.clone(),
         link: item.link.clone(),
         branch: item.branch.clone(),
+        prealert_min: item.prealert_min,
     };
+    if let Some(v) = p.get("prealert") {
+        e.prealert_min = parse_prealert(v)?;
+    }
     if let Some(v) = str_field(p, "title") {
         e.title = v.to_string();
     }
@@ -206,6 +219,7 @@ fn update(ctx: &Ctx, p: &Value) -> Out {
     if e.title.trim().is_empty() {
         return Err(bad("title cannot be empty"));
     }
+    gate_edit(&mut e, Some(&item), ctx.pro);
     let u = ctx.db.update(&item.id, &e, ctx.now).map_err(internal)?;
     Ok((view(&u, ctx.now), true))
 }
@@ -251,6 +265,20 @@ fn parse_priority(v: &Value) -> Result<i64, ApiError> {
         Some("critical") => Ok(3),
         _ => Err(bad("priority must be low, normal, urgent or critical")),
     }
+}
+
+/// `15`, `"15m"`, `"1h"`, `"1d"`, `"none"`/null: minutes before the due time.
+fn parse_prealert(v: &Value) -> Result<Option<i64>, ApiError> {
+    let mins = match v {
+        Value::Null => return Ok(None),
+        Value::Number(n) => n.as_i64(),
+        Value::String(s) if matches!(s.trim().to_lowercase().as_str(), "" | "none" | "off") => return Ok(None),
+        Value::String(s) => parse_duration_ms(s).map(|ms| ms / 60_000),
+        _ => None,
+    };
+    mins.filter(|m| crate::model::PREALERTS.contains(m))
+        .map(Some)
+        .ok_or_else(|| bad("prealert must be one of 5m, 15m, 30m, 1h, 1d (or null)"))
 }
 
 fn parse_repeat(s: &str) -> Result<String, ApiError> {
@@ -329,6 +357,7 @@ pub fn view(i: &Item, now: i64) -> Value {
         "overdue": !i.is_done() && i.effective_at().is_some_and(|d| d < now),
         "repeat": i.repeat,
         "priority": priority_name(i.priority),
+        "prealertMin": i.prealert_min,
         "tag": i.tag,
         "link": i.link,
         "branch": i.branch,
@@ -554,12 +583,28 @@ mod tests {
     #[test]
     fn add_accepts_structured_fields_and_rejects_bad_input() {
         let db = Db::open_memory().unwrap();
-        let r = run(&db, false, "add", json!({"title": "Ship", "due": "2030-01-02 15:30", "priority": "critical", "repeat": "weekly", "notes": "- a"})).unwrap();
-        assert_eq!((r["priority"].as_str(), r["repeat"].as_str(), r["notes"].as_str()), (Some("critical"), Some("weekly"), Some("- a")));
+        let r = run(&db, false, "add", json!({"title": "Ship", "due": "2030-01-02 15:30", "priority": "urgent", "repeat": "weekly", "notes": "- a"})).unwrap();
+        assert_eq!((r["priority"].as_str(), r["repeat"].as_str(), r["notes"].as_str()), (Some("urgent"), Some("weekly"), Some("- a")));
         assert!(r["due"].as_str().unwrap().starts_with("2030-01-02T15:30"));
         assert_eq!(run(&db, false, "add", json!({})).unwrap_err().code, "invalid_params");
         assert_eq!(run(&db, false, "add", json!({"title": "x", "due": "never-ish"})).unwrap_err().code, "invalid_params");
         assert_eq!(run(&db, false, "add", json!({"title": "x", "repeat": "yearly"})).unwrap_err().code, "invalid_params");
+    }
+
+    #[test]
+    fn critical_and_prealert_are_pro_in_the_api_too() {
+        let db = Db::open_memory().unwrap();
+        // Explicitly asking a free build for them is an error...
+        assert_eq!(run(&db, false, "add", json!({"title": "x", "priority": "critical"})).unwrap_err().code, REQUIRES_PRO);
+        assert_eq!(run(&db, false, "add", json!({"title": "x", "due": "1h", "prealert": "15m"})).unwrap_err().code, REQUIRES_PRO);
+        // ...while the `!!!` token in free text degrades to Urgent.
+        assert_eq!(add(&db, "ship it !!!")["priority"], "urgent");
+        // Pro: both work, and update can change them.
+        let r = run(&db, true, "add", json!({"title": "x", "due": "2h", "priority": "critical", "prealert": "30m"})).unwrap();
+        assert_eq!((r["priority"].as_str(), r["prealertMin"].as_i64()), (Some("critical"), Some(30)));
+        let u = run(&db, true, "update", json!({"id": r["id"], "prealert": null})).unwrap();
+        assert!(u["prealertMin"].is_null());
+        assert!(run(&db, true, "update", json!({"id": r["id"], "prealert": "7m"})).is_err());
     }
 
     #[test]

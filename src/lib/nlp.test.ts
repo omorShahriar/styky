@@ -75,4 +75,11 @@ describe("parseQuick", () => {
   it("empty input parses to nothing", () => {
     expect(parseQuick("   ", now)).toMatchObject({ title: "", dueAt: null, chips: [] });
   });
+
+  it("!!! is critical (priority 3)", () => {
+    const p = parseQuick("Deploy hotfix !!!", now);
+    expect(p.priority).toBe(3);
+    expect(p.title).toBe("Deploy hotfix");
+    expect(p.chips.find((c) => c.kind === "priority")?.label).toBe("Critical");
+  });
 });

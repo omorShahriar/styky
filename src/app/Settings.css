@@ -315,3 +315,13 @@ code {
   font-family: var(--font-mono);
   font-size: 12px;
 }
+
+.row-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.locked {
+  opacity: 0.5;
+  pointer-events: none;
+}

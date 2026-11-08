@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::db::{Db, Res};
-use crate::model::{ExportFile, ImportResult, Item, ItemEdit};
+use crate::model::{ExportFile, ImportResult, Item, ItemEdit, gate_edit};
 use crate::{theme, window};
 
 pub fn now_ms() -> i64 {
@@ -36,14 +36,19 @@ pub fn list_items(app: AppHandle, db: State<Db>) -> Res<Vec<Item>> {
 }
 
 #[tauri::command]
-pub fn create_item(app: AppHandle, db: State<Db>, edit: ItemEdit) -> Res<Item> {
+pub fn create_item(app: AppHandle, db: State<Db>, mut edit: ItemEdit) -> Res<Item> {
+    gate_edit(&mut edit, None, crate::license::is_pro());
     let item = db.create(&edit, now_ms())?;
     changed(&app);
     Ok(item)
 }
 
 #[tauri::command]
-pub fn update_item(app: AppHandle, db: State<Db>, id: String, edit: ItemEdit) -> Res<Item> {
+pub fn update_item(app: AppHandle, db: State<Db>, id: String, mut edit: ItemEdit) -> Res<Item> {
+    if !crate::license::is_pro() {
+        let existing = db.get_item(&id)?;
+        gate_edit(&mut edit, Some(&existing), false);
+    }
     let item = db.update(&id, &edit, now_ms())?;
     changed(&app);
     Ok(item)

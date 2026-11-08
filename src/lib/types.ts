@@ -1,6 +1,6 @@
 export type Repeat = "none" | "daily" | "weekdays" | "weekly" | "monthly";
-/** 0 low, 1 normal, 2 urgent */
-export type Priority = 0 | 1 | 2;
+/** 0 low, 1 normal, 2 urgent, 3 critical (Pro: keeps re-notifying) */
+export type Priority = 0 | 1 | 2 | 3;
 
 export interface Item {
   id: string;
@@ -20,6 +20,10 @@ export interface Item {
   createdAt: number;
   updatedAt: number;
   repeatAnchorDay: number | null;
+  /** Pro: minutes before the due time for a heads-up toast (5, 15, 30, 60, 1440). */
+  prealertMin: number | null;
+  preFiredAt: number | null;
+  lastNagAt: number | null;
 }
 
 /** The fields the editor can change. */
@@ -32,6 +36,7 @@ export interface ItemEdit {
   tag: string | null;
   link: string | null;
   branch: string | null;
+  prealertMin: number | null;
 }
 
 export interface ImportResult {
@@ -49,6 +54,7 @@ export const emptyEdit = (): ItemEdit => ({
   tag: null,
   link: null,
   branch: null,
+  prealertMin: null,
 });
 
 export const toEdit = (i: Item): ItemEdit => ({
@@ -60,4 +66,5 @@ export const toEdit = (i: Item): ItemEdit => ({
   tag: i.tag,
   link: i.link,
   branch: i.branch,
+  prealertMin: i.prealertMin,
 });

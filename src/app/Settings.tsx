@@ -13,6 +13,8 @@ import { pressSpring } from "../lib/motion";
 import { keyToAccelerator, prettyHotkey } from "../lib/hotkey";
 import { ProCard } from "./ProCard";
 import { ConnectAI } from "./ConnectAI";
+import { ProPill } from "../components/ProPill";
+import { usePro } from "../lib/pro";
 import "./Settings.css";
 
 const THEMES = [
@@ -25,6 +27,13 @@ const SNOOZES = [
   { id: "1h", label: "1 hour" },
   { id: "evening", label: "This evening (18:00)" },
   { id: "tomorrow", label: "Tomorrow (09:00)" },
+];
+const NAG_MINUTES = [
+  { id: "5", label: "5 minutes" },
+  { id: "10", label: "10 minutes" },
+  { id: "15", label: "15 minutes" },
+  { id: "30", label: "30 minutes" },
+  { id: "60", label: "1 hour" },
 ];
 const CLEAR_DAYS = [
   { id: "0", label: "Never" },
@@ -179,6 +188,7 @@ type UpdateState =
   | { s: "error"; msg: string };
 
 export default function Settings() {
+  const pro = usePro();
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [autostart, setAutostart] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -384,6 +394,41 @@ export default function Settings() {
         </Group>
 
         <ConnectAI />
+
+        <Group
+          title="Escalation"
+          footer="Critical reminders (priority !!! or Critical in the editor) notify again until you mark them done or snooze them."
+        >
+          <Row label="Critical re-notify every" hint={pro ? undefined : "Styky Pro"}>
+            <span className="row-inline">
+              {!pro && <ProPill />}
+              <select
+                value={settings.escalation_minutes ?? "10"}
+                disabled={!pro}
+                onChange={(e) => void set("escalation_minutes", e.target.value)}
+                aria-label="Critical re-notify interval"
+              >
+                {NAG_MINUTES.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </Row>
+          <Row label="Bring the panel forward" hint="Raise Styky with each re-notification">
+            <span className="row-inline">
+              {!pro && <ProPill />}
+              <span className={pro ? "" : "locked"}>
+                <Switch
+                  label="Bring the panel forward on re-notify"
+                  checked={pro && settings.escalation_bring_forward === "1"}
+                  onChange={(v) => pro && void set("escalation_bring_forward", v ? "1" : "0")}
+                />
+              </span>
+            </span>
+          </Row>
+        </Group>
 
         <Group title="Data" footer={note || "Exports are plain JSON. Replace overwrites everything."}>
           <Row label="Export">

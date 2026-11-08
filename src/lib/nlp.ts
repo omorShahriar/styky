@@ -3,6 +3,7 @@
  *
  * Grammar (tokens can appear anywhere in the line):
  *   #tag               tag / project
+ *   !!!                critical (priority 3, Pro: free builds fall back to urgent)
  *   !!                 urgent (priority 2)
  *   !                  explicit "normal" (priority 1, which is also the default; the chip confirms it was seen)
  *   !low               low (priority 0)
@@ -47,7 +48,7 @@ const REPEAT_LABEL: Record<Repeat, string> = {
   weekly: "Every week",
   monthly: "Every month",
 };
-const PRIORITY_LABEL: Record<Priority, string> = { 0: "Low", 1: "Normal", 2: "Urgent" };
+const PRIORITY_LABEL: Record<Priority, string> = { 0: "Low", 1: "Normal", 2: "Urgent", 3: "Critical" };
 
 const DEFAULT_HOUR = 9;
 
@@ -97,9 +98,9 @@ export function parseQuick(input: string, now: Date = new Date()): QuickParse {
     priority = 0;
     prioritySeen = true;
   } else {
-    t = take(text, /(?<=\s)(!{1,2})(?=\s)/);
+    t = take(text, /(?<=\s)(!{1,3})(?=\s)/);
     if (t.match) {
-      priority = t.match[1].length === 2 ? 2 : 1;
+      priority = t.match[1].length === 3 ? 3 : t.match[1].length === 2 ? 2 : 1;
       prioritySeen = true;
     }
   }
@@ -158,5 +159,6 @@ export function toItemEdit(p: QuickParse): ItemEdit {
     tag: p.tag,
     link: p.link,
     branch: p.branch,
+    prealertMin: null,
   };
 }

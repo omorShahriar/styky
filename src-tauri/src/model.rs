@@ -30,6 +30,15 @@ pub struct Item {
     /// Day of month a monthly repeat keeps returning to (31st stays 31st through short months).
     #[serde(default)]
     pub repeat_anchor_day: Option<i64>,
+    /// Pro: minutes before `due_at` for a heads-up toast (5, 15, 30, 60 or 1440).
+    #[serde(default)]
+    pub prealert_min: Option<i64>,
+    /// When the pre-alert fired for the current due time.
+    #[serde(default)]
+    pub pre_fired_at: Option<i64>,
+    /// Pro: last time a Critical item re-notified.
+    #[serde(default)]
+    pub last_nag_at: Option<i64>,
 }
 
 impl Item {
@@ -55,6 +64,7 @@ pub struct ItemEdit {
     pub tag: Option<String>,
     pub link: Option<String>,
     pub branch: Option<String>,
+    pub prealert_min: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +91,26 @@ pub fn normalize_repeat(r: &str) -> &'static str {
         "monthly" => "monthly",
         _ => "none",
     }
+}
+
+/// Pre-alert lengths the UI offers (minutes).
+pub const PREALERTS: [i64; 5] = [5, 15, 30, 60, 1440];
+
+pub fn normalize_prealert(p: Option<i64>) -> Option<i64> {
+    p.filter(|m| PREALERTS.contains(m))
+}
+
+/// Free builds cannot set Pro-only fields: Critical falls back to Urgent and pre-alerts keep their old
+/// value (none for a new item). Values an item already has are never taken away by an unrelated edit.
+pub fn gate_edit(edit: &mut ItemEdit, existing: Option<&Item>, pro: bool) {
+    if pro {
+        return;
+    }
+    let had_critical = existing.is_some_and(|i| i.priority == PRIORITY_CRITICAL);
+    if edit.priority >= PRIORITY_CRITICAL && !had_critical {
+        edit.priority = PRIORITY_URGENT;
+    }
+    edit.prealert_min = existing.and_then(|i| i.prealert_min);
 }
 
 /// Trim and turn empty strings into `None`.
@@ -113,6 +143,9 @@ impl Item {
             created_at: 0,
             updated_at: 0,
             repeat_anchor_day: None,
+            prealert_min: None,
+            pre_fired_at: None,
+            last_nag_at: None,
         }
     }
 }

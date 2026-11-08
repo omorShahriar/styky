@@ -201,7 +201,7 @@ export default function Panel() {
     const hidden = draft?.id ?? null;
     const visible = items.filter((i) => i.id !== hidden);
     const openItems = visible.filter((i) => i.status === "open");
-    const isPlain = (i: Item) => i.dueAt == null && i.snoozedUntil == null && i.priority !== 2;
+    const isPlain = (i: Item) => i.dueAt == null && i.snoozedUntil == null && i.priority < 2;
     return {
       open: openItems,
       lead: openItems.filter((i) => !isPlain(i)),

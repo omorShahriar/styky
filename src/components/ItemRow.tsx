@@ -195,7 +195,9 @@ export function ItemRow({ item, reorderable, onDragEnd }: Props) {
         <div className="main">
           <div className="title-line">
             <span className="title">{item.title}</span>
-            {item.priority === 2 && !done && <span className="urgent-dot" title="Urgent" />}
+            {item.priority >= 2 && !done && (
+              <span className={`urgent-dot${item.priority === 3 ? " critical" : ""}`} title={item.priority === 3 ? "Critical" : "Urgent"} />
+            )}
           </div>
           {meta.length > 0 && (
             <div className="meta">

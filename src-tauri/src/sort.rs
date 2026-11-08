@@ -27,7 +27,7 @@ fn open_key(i: &Item, now: i64) -> (u8, u8, u8, i64, f64) {
     let overdue = eff.is_some_and(|t| t < now);
     (
         u8::from(!overdue),
-        u8::from(i.priority != PRIORITY_URGENT),
+        u8::from(i.priority < PRIORITY_URGENT),
         u8::from(eff.is_none()),
         eff.unwrap_or(0),
         i.sort_order,
@@ -56,6 +56,9 @@ mod tests {
             sort_order: order,
             created_at: 0,
             repeat_anchor_day: None,
+            prealert_min: None,
+            pre_fired_at: None,
+            last_nag_at: None,
             updated_at: 0,
         }
     }
