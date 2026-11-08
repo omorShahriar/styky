@@ -22,7 +22,7 @@ src-tauri/gen/
 .before.json
 
 # MSIX build output (throwaway signing cert/pfx)
-dist-msix/
+dist-msix*/
 *.pfx
 *.msix
 *.cer
