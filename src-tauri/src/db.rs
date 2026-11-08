@@ -418,6 +418,37 @@ impl Db {
         Ok(())
     }
 
+    /// Update validated_at/customer only if the cached entitlement is still this key + instance.
+    pub fn license_renew(&self, key: &str, instance_id: &str, now: i64, customer: Option<&str>) -> Res<bool> {
+        let n = self
+            .conn()
+            .execute(
+                "UPDATE license SET validated_at = ?1, customer = ?2 WHERE id = 1 AND key = ?3 AND instance_id = ?4",
+                params![now, customer, key, instance_id],
+            )
+            .map_err(err)?;
+        Ok(n > 0)
+    }
+
+    /// Delete the cached entitlement only if it is still this key + instance.
+    pub fn license_clear_if(&self, key: &str, instance_id: &str) -> Res<bool> {
+        let n = self
+            .conn()
+            .execute("DELETE FROM license WHERE id = 1 AND key = ?1 AND instance_id = ?2", params![key, instance_id])
+            .map_err(err)?;
+        Ok(n > 0)
+    }
+
+    /// A random id for this install (used in the licence instance name instead of the PC name).
+    pub fn install_id(&self) -> String {
+        if let Some(id) = self.settings().ok().and_then(|s| s.get("install_id").cloned()) {
+            return id;
+        }
+        let id = uuid::Uuid::new_v4().simple().to_string()[..8].to_string();
+        let _ = self.set_setting("install_id", &id);
+        id
+    }
+
     pub fn license_clear(&self) -> Res<()> {
         self.conn().execute("DELETE FROM license", []).map_err(err)?;
         Ok(())
@@ -471,7 +502,11 @@ impl Db {
             version: 1,
             exported_at: now,
             items,
-            settings: self.settings()?,
+            settings: {
+                let mut s = self.settings()?;
+                s.remove("install_id");
+                s
+            },
         })
     }
 

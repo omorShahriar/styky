@@ -154,7 +154,7 @@ pub async fn license_activate(app: AppHandle, key: String) -> Res<crate::license
         let db = app.state::<Db>();
         let before = crate::license::is_pro();
         let now = now_ms();
-        crate::license::activate(&db, &crate::license::UreqHttp, &key, &crate::license::instance_name(), now)?;
+        crate::license::activate(&db, &crate::license::UreqHttp, &key, &crate::license::instance_name(&db), now)?;
         crate::license::refresh(&db, now);
         pro_changed(&app, before);
         Ok(crate::license::status(&db, now))
