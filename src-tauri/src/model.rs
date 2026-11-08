@@ -25,6 +25,9 @@ pub struct Item {
     pub sort_order: f64,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Day of month a monthly repeat keeps returning to (31st stays 31st through short months).
+    #[serde(default)]
+    pub repeat_anchor_day: Option<i64>,
 }
 
 impl Item {

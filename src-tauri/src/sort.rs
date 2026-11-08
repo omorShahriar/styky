@@ -55,6 +55,7 @@ mod tests {
             completed_at: None,
             sort_order: order,
             created_at: 0,
+            repeat_anchor_day: None,
             updated_at: 0,
         }
     }

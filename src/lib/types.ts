@@ -19,6 +19,7 @@ export interface Item {
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
+  repeatAnchorDay: number | null;
 }
 
 /** The fields the editor can change. */

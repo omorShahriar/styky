@@ -43,8 +43,10 @@ CREATE TABLE items (
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 ";
 
+const SCHEMA_V2: &str = "ALTER TABLE items ADD COLUMN repeat_anchor_day INTEGER;";
+
 const COLS: &str = "id, title, body_md, due_at, repeat, priority, tag, link, branch, status, \
-                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at";
+                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day";
 
 fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
     Ok(Item {
@@ -64,13 +66,14 @@ fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
         sort_order: r.get(13)?,
         created_at: r.get(14)?,
         updated_at: r.get(15)?,
+        repeat_anchor_day: r.get(16)?,
     })
 }
 
 fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
     conn.execute(
         &format!(
-            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)"
+            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)"
         ),
         params![
             i.id,
@@ -88,7 +91,8 @@ fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
             i.completed_at,
             i.sort_order,
             i.created_at,
-            i.updated_at
+            i.updated_at,
+            i.repeat_anchor_day
         ],
     )?;
     Ok(())
@@ -167,7 +171,10 @@ impl Db {
             sort_order: max.unwrap_or(0.0) + 1.0,
             created_at: now,
             updated_at: now,
+            repeat_anchor_day: None,
         };
+        let mut item = item;
+        item.repeat_anchor_day = anchor_for(&item.repeat, item.due_at);
         upsert(&conn, &item).map_err(err)?;
         Ok(item)
     }
@@ -175,6 +182,8 @@ impl Db {
     pub fn update(&self, id: &str, edit: &ItemEdit, now: i64) -> Res<Item> {
         let conn = self.conn();
         let mut item = Self::get(&conn, id)?;
+        let repeat = normalize_repeat(&edit.repeat);
+        let re_anchor = item.due_at != edit.due_at || item.repeat != repeat;
         if item.due_at != edit.due_at {
             // A new due time re-arms the reminder.
             item.snoozed_until = None;
@@ -189,6 +198,9 @@ impl Db {
         item.link = clean_opt(&edit.link);
         item.branch = clean_opt(&edit.branch);
         item.updated_at = now;
+        if re_anchor || item.repeat_anchor_day.is_none() {
+            item.repeat_anchor_day = anchor_for(&item.repeat, item.due_at);
+        }
         upsert(&conn, &item).map_err(err)?;
         Ok(item)
     }
@@ -211,7 +223,7 @@ impl Db {
         let mut item = Self::get(&conn, id)?;
         let next = item
             .due_at
-            .and_then(|due| repeat::next_occurrence(due, &item.repeat, now));
+            .and_then(|due| repeat::next_occurrence(due, &item.repeat, now, item.repeat_anchor_day.map(|d| d as u32)));
         match next {
             Some(next_due) => {
                 item.due_at = Some(next_due);
@@ -371,6 +383,14 @@ impl Db {
     }
 }
 
+/// The anchor day is only meaningful for monthly items that have a due date.
+fn anchor_for(repeat: &str, due_at: Option<i64>) -> Option<i64> {
+    if repeat != "monthly" {
+        return None;
+    }
+    due_at.and_then(repeat::local_day).map(i64::from)
+}
+
 /// `PRAGMA user_version` migrations.
 fn migrate(conn: &Connection) -> Res<()> {
     let version: i64 = conn
@@ -378,6 +398,10 @@ fn migrate(conn: &Connection) -> Res<()> {
         .map_err(err)?;
     if version < 1 {
         conn.execute_batch(&format!("BEGIN; {SCHEMA_V1} PRAGMA user_version = 1; COMMIT;"))
+            .map_err(err)?;
+    }
+    if version < 2 {
+        conn.execute_batch(&format!("BEGIN; {SCHEMA_V2} PRAGMA user_version = 2; COMMIT;"))
             .map_err(err)?;
     }
     Ok(())
@@ -532,5 +556,35 @@ mod tests {
         e.due_at = Some(900);
         let u = db.update(&a.id, &e, 3).unwrap();
         assert_eq!(u.snoozed_until, None);
+    }
+
+    #[test]
+    fn monthly_item_keeps_its_anchor_day_across_completions() {
+        use chrono::{Local, TimeZone};
+        let ms = |y, m, d| Local.with_ymd_and_hms(y, m, d, 8, 0, 0).unwrap().timestamp_millis();
+        let db = Db::open_memory().unwrap();
+        let mut e = edit("rotate keys");
+        e.repeat = "monthly".into();
+        e.due_at = Some(ms(2026, 1, 31));
+        let a = db.create(&e, 1).unwrap();
+        assert_eq!(a.repeat_anchor_day, Some(31));
+        let feb = db.complete(&a.id, ms(2026, 1, 31)).unwrap();
+        assert_eq!(feb.due_at, Some(ms(2026, 2, 28)));
+        let mar = db.complete(&a.id, ms(2026, 2, 28)).unwrap();
+        assert_eq!(mar.due_at, Some(ms(2026, 3, 31)));
+        // Editing the due date re-anchors; leaving monthly clears the anchor.
+        e.due_at = Some(ms(2026, 3, 15));
+        assert_eq!(db.update(&a.id, &e, 5).unwrap().repeat_anchor_day, Some(15));
+        e.repeat = "weekly".into();
+        assert_eq!(db.update(&a.id, &e, 6).unwrap().repeat_anchor_day, None);
+    }
+
+    #[test]
+    fn migration_v2_adds_anchor_column_to_a_v1_database() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(&format!("{SCHEMA_V1} PRAGMA user_version = 1;")).unwrap();
+        conn.execute("INSERT INTO items (id,title,sort_order,created_at,updated_at) VALUES ('a', 't', 1, 1, 1)", []).unwrap();
+        let db = Db::init(conn).unwrap();
+        assert_eq!(db.list(0).unwrap()[0].repeat_anchor_day, None);
     }
 }
