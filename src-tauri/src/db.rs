@@ -10,6 +10,7 @@ use crate::model::{
     ExportFile, ImportResult, Item, ItemEdit, PRIORITY_LOW, PRIORITY_URGENT, clean_opt,
     normalize_repeat,
 };
+use crate::license::Entitlement;
 use crate::{repeat, sort};
 
 pub type Res<T> = Result<T, String>;
@@ -49,6 +50,15 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 ";
 
 const SCHEMA_V2: &str = "ALTER TABLE items ADD COLUMN repeat_anchor_day INTEGER;";
+
+/// Pro license cache (kept out of `settings` so exports never carry the key).
+const SCHEMA_V3: &str = "CREATE TABLE license (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  key TEXT NOT NULL,
+  instance_id TEXT NOT NULL,
+  validated_at INTEGER NOT NULL,
+  customer TEXT
+);";
 
 const COLS: &str = "id, title, body_md, due_at, repeat, priority, tag, link, branch, status, \
                     snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day";
@@ -314,6 +324,39 @@ impl Db {
         tx.commit().map_err(err)
     }
 
+    pub fn license_get(&self) -> Res<Option<Entitlement>> {
+        self.conn()
+            .query_row(
+                "SELECT key, instance_id, validated_at, customer FROM license WHERE id = 1",
+                [],
+                |r| {
+                    Ok(Entitlement {
+                        key: r.get(0)?,
+                        instance_id: r.get(1)?,
+                        validated_at: r.get(2)?,
+                        customer: r.get(3)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(err)
+    }
+
+    pub fn license_set(&self, e: &Entitlement) -> Res<()> {
+        self.conn()
+            .execute(
+                "INSERT OR REPLACE INTO license (id, key, instance_id, validated_at, customer) VALUES (1, ?1, ?2, ?3, ?4)",
+                params![e.key, e.instance_id, e.validated_at, e.customer],
+            )
+            .map_err(err)?;
+        Ok(())
+    }
+
+    pub fn license_clear(&self) -> Res<()> {
+        self.conn().execute("DELETE FROM license", []).map_err(err)?;
+        Ok(())
+    }
+
     pub fn settings(&self) -> Res<BTreeMap<String, String>> {
         let conn = self.conn();
         let mut map: BTreeMap<String, String> = DEFAULT_SETTINGS
@@ -429,6 +472,10 @@ fn migrate(conn: &Connection) -> Res<()> {
     }
     if version < 2 {
         conn.execute_batch(&format!("BEGIN; {SCHEMA_V2} PRAGMA user_version = 2; COMMIT;"))
+            .map_err(err)?;
+    }
+    if version < 3 {
+        conn.execute_batch(&format!("BEGIN; {SCHEMA_V3} PRAGMA user_version = 3; COMMIT;"))
             .map_err(err)?;
     }
     Ok(())

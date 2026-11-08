@@ -2,6 +2,7 @@ mod commands;
 mod db;
 #[cfg(windows)]
 mod desktop;
+mod license;
 mod model;
 mod notify;
 mod quickadd;
@@ -61,6 +62,7 @@ pub fn run() {
             commands::quit,
             commands::quickadd_hotkey_error,
             commands::open_settings,
+            commands::open_settings_pro,
             commands::list_items,
             commands::create_item,
             commands::update_item,
@@ -76,6 +78,9 @@ pub fn run() {
             commands::import_json,
             commands::hide_quickadd,
             commands::set_quickadd_hotkey,
+            commands::license_status,
+            commands::license_activate,
+            commands::license_remove,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -107,6 +112,7 @@ pub fn run() {
             quickadd::setup(&handle);
             quickadd::init(&handle);
             scheduler::spawn(handle.clone());
+            spawn_license_check(handle.clone());
             Ok(())
         })
         .on_window_event(|win, event| {
@@ -157,6 +163,17 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Styky");
+}
+
+/// Load the cached entitlement, then re-check it (if due) at start and every 6 hours.
+fn spawn_license_check(app: tauri::AppHandle) {
+    license::refresh(&app.state::<db::Db>(), commands::now_ms());
+    std::thread::spawn(move || {
+        loop {
+            license::background_check(&app);
+            std::thread::sleep(Duration::from_secs(6 * 3600));
+        }
+    });
 }
 
 /// Release builds turn "launch at login" on once, the first time they run; after that the user's choice wins.

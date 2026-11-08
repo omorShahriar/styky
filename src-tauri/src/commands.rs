@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 use crate::db::{Db, Res};
@@ -129,6 +129,50 @@ pub fn import_json(app: AppHandle, db: State<Db>, path: String, mode: String) ->
     Ok(result)
 }
 
+// ------------------------------------------------------------------ pro
+
+fn pro_changed(app: &AppHandle, before: bool) {
+    if before != crate::license::is_pro() {
+        let _ = app.emit("pro-changed", crate::license::is_pro());
+    }
+}
+
+#[tauri::command]
+pub fn license_status(db: State<Db>) -> crate::license::Status {
+    crate::license::status(&db, now_ms())
+}
+
+/// Activate a key (network: runs off the main thread).
+#[tauri::command]
+pub async fn license_activate(app: AppHandle, key: String) -> Res<crate::license::Status> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = app.state::<Db>();
+        let before = crate::license::is_pro();
+        let now = now_ms();
+        crate::license::activate(&db, &crate::license::UreqHttp, &key, &crate::license::instance_name(), now)?;
+        crate::license::refresh(&db, now);
+        pro_changed(&app, before);
+        Ok(crate::license::status(&db, now))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// "Remove license": free the activation slot, forget the key. Returns whether the slot was freed online.
+#[tauri::command]
+pub async fn license_remove(app: AppHandle) -> Res<bool> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let db = app.state::<Db>();
+        let before = crate::license::is_pro();
+        let freed = crate::license::deactivate(&db, &crate::license::UreqHttp)?;
+        crate::license::refresh(&db, now_ms());
+        pro_changed(&app, before);
+        Ok(freed)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 // ---------------------------------------------------------------- system
 
 #[tauri::command]
@@ -190,6 +234,13 @@ pub fn set_quickadd_hotkey(app: AppHandle, hotkey: String) -> Res<()> {
 #[tauri::command]
 pub fn open_settings(app: AppHandle) {
     crate::settings_win::show(&app);
+}
+
+/// Open Settings scrolled to the Styky Pro card (the "Pro" pill target).
+#[tauri::command]
+pub fn open_settings_pro(app: AppHandle) {
+    crate::settings_win::show(&app);
+    let _ = app.emit_to(crate::settings_win::LABEL, "open-pro-card", ());
 }
 
 /// Why the saved quick-add hotkey is not active (None when it is registered).

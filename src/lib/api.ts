@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { LicenseStatus } from "./pro";
 import type { ImportResult, Item, ItemEdit } from "./types";
 
 export const api = {
@@ -7,6 +8,10 @@ export const api = {
   hideQuickadd: () => invoke<void>("hide_quickadd"),
   setQuickaddHotkey: (hotkey: string) => invoke<void>("set_quickadd_hotkey", { hotkey }),
   openSettings: () => invoke<void>("open_settings"),
+  openSettingsPro: () => invoke<void>("open_settings_pro"),
+  licenseStatus: () => invoke<LicenseStatus>("license_status"),
+  licenseActivate: (key: string) => invoke<LicenseStatus>("license_activate", { key }),
+  licenseRemove: () => invoke<boolean>("license_remove"),
   quickaddHotkeyError: () => invoke<string | null>("quickadd_hotkey_error"),
   quit: () => invoke<void>("quit"),
   getAutostart: () => invoke<boolean>("get_autostart"),

@@ -11,6 +11,7 @@ import { api } from "../lib/api";
 import { applyThemeMode, initTheme } from "../lib/theme";
 import { pressSpring } from "../lib/motion";
 import { keyToAccelerator, prettyHotkey } from "../lib/hotkey";
+import { ProCard } from "./ProCard";
 import "./Settings.css";
 
 const THEMES = [
@@ -202,6 +203,13 @@ export default function Settings() {
     void getVersion().then(setVersion);
     void api.isStore().then(setStore);
     const ev = listen("settings-changed", () => void load());
+    const pro = listen("open-pro-card", () => {
+      const el = document.getElementById("pro-card");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      el?.classList.remove("flash");
+      void el?.offsetWidth;
+      el?.classList.add("flash");
+    });
     // The autostart toggle can also change in the tray; refresh when we regain focus.
     const onFocus = () => void load();
     window.addEventListener("focus", onFocus);
@@ -213,6 +221,7 @@ export default function Settings() {
       dead = true;
       off?.();
       void ev.then((u) => u());
+      void pro.then((u) => u());
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("keydown", onKey);
     };
@@ -318,6 +327,8 @@ export default function Settings() {
   return (
     <div className="settings">
       <div className="scroll">
+        <ProCard />
+
         <Group title="Appearance">
           <Row label="Theme">
             <Segmented
