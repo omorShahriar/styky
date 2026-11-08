@@ -1,6 +1,6 @@
 //! Styky Pro licensing against the Lemon Squeezy License API (public endpoints, no secret key).
 //!
-//! * `activate` binds a key to this PC (`instance_name` = "<PC name> Styky"); the entitlement
+//! * `activate` binds a key to this PC (`instance_name` = "Styky" + a random per-install id, never the PC name); the entitlement
 //!   (key, instance id, last successful validation) is cached in the `license` table.
 //! * Pro is on while the last successful validation is at most [`GRACE_MS`] (30 days) old.
 //! * [`revalidate_due`] re-checks after [`REVALIDATE_MS`] (7 days). **Only an explicit rejection**

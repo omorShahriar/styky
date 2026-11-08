@@ -1,7 +1,7 @@
 # Styky Pro — Plan and v1 decisions
 
 **Model:** Styky stays free and MIT-licensed. **Styky Pro** is a **one-time unlock** (early-bird **$4.99**, then **$6.99**)
-that adds power features on top. Nothing that is free today becomes paid. Sold through **Lemon Squeezy** (merchant of record).
+that adds power features on top. Nothing that is free today becomes paid. Sold through **Lemon Squeezy** (merchant of record). Setup steps: [LEMONSQUEEZY.md](LEMONSQUEEZY.md).
 
 > Status: **Pro v1 is implemented** (branch `claude/pro-v1-*`; see `docs/NOTES.md` → "Pro v1 notes" for what was built, how it was
 > verified and what is left for the owner). The sections below are the plan with the final decisions folded in.
