@@ -19,7 +19,8 @@ fn err<E: std::fmt::Display>(e: E) -> String {
 }
 
 /// Default settings; stored values override them.
-pub const DEFAULT_SETTINGS: [(&str, &str); 1] = [("autoclear_days", "7")];
+pub const DEFAULT_SETTINGS: [(&str, &str); 2] =
+    [("autoclear_days", "7"), ("quickadd_hotkey", "Ctrl+Alt+N")];
 
 const SCHEMA_V1: &str = "
 CREATE TABLE items (
@@ -147,6 +148,28 @@ impl Db {
             .map_err(err)?;
         sort::sort_items(&mut items, now);
         Ok(items)
+    }
+
+    /// Open items only (the scheduler's working set).
+    pub fn list_open(&self) -> Res<Vec<Item>> {
+        let conn = self.conn();
+        let mut stmt = conn
+            .prepare(&format!("SELECT {COLS} FROM items WHERE status = 'open'"))
+            .map_err(err)?;
+        stmt.query_map([], row_to_item)
+            .map_err(err)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(err)
+    }
+
+    /// Record that these items have fired (does not touch `updated_at`).
+    pub fn mark_fired(&self, ids: &[String], now: i64) -> Res<()> {
+        let conn = self.conn();
+        for id in ids {
+            conn.execute("UPDATE items SET last_fired_at = ?1 WHERE id = ?2", params![now, id])
+                .map_err(err)?;
+        }
+        Ok(())
     }
 
     pub fn create(&self, edit: &ItemEdit, now: i64) -> Res<Item> {

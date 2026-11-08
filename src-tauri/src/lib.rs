@@ -3,7 +3,11 @@ mod db;
 #[cfg(windows)]
 mod desktop;
 mod model;
+mod notify;
+mod quickadd;
 mod repeat;
+mod scheduler;
+mod snooze;
 mod sort;
 mod theme;
 mod tray;
@@ -35,6 +39,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -57,6 +62,8 @@ pub fn run() {
             commands::set_setting,
             commands::export_json,
             commands::import_json,
+            commands::hide_quickadd,
+            commands::set_quickadd_hotkey,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -84,9 +91,19 @@ pub fn run() {
             #[cfg(windows)]
             desktop::spawn_watcher(handle.clone());
             tray::build(&handle)?;
+            quickadd::setup(&handle);
+            quickadd::init(&handle);
+            scheduler::spawn(handle.clone());
             Ok(())
         })
         .on_window_event(|win, event| {
+            if win.label() == quickadd::LABEL {
+                // Blur hides the bar (Esc / Enter are handled in the page).
+                if let WindowEvent::Focused(false) = event {
+                    quickadd::hide(win.app_handle());
+                }
+                return;
+            }
             if win.label() != window::MAIN {
                 return;
             }

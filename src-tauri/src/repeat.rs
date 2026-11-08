@@ -7,7 +7,7 @@ fn to_local(ms: i64) -> Option<DateTime<Local>> {
 }
 
 /// Local wall-clock time -> ms, resolving DST gaps/overlaps sensibly.
-fn from_naive(n: NaiveDateTime) -> Option<i64> {
+pub fn from_naive(n: NaiveDateTime) -> Option<i64> {
     match Local.from_local_datetime(&n) {
         LocalResult::Single(d) => Some(d.timestamp_millis()),
         LocalResult::Ambiguous(a, _) => Some(a.timestamp_millis()),

@@ -88,3 +88,29 @@ pub fn clean_opt(s: &Option<String>) -> Option<String> {
         .filter(|v| !v.is_empty())
         .map(str::to_string)
 }
+
+#[cfg(test)]
+impl Item {
+    /// A plain open item for tests.
+    pub fn blank(id: &str) -> Item {
+        Item {
+            id: id.into(),
+            title: id.into(),
+            body_md: String::new(),
+            due_at: None,
+            repeat: "none".into(),
+            priority: 1,
+            tag: None,
+            link: None,
+            branch: None,
+            status: "open".into(),
+            snoozed_until: None,
+            last_fired_at: None,
+            completed_at: None,
+            sort_order: 0.0,
+            created_at: 0,
+            updated_at: 0,
+            repeat_anchor_day: None,
+        }
+    }
+}

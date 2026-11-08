@@ -18,7 +18,6 @@ use std::time::Duration;
 static SUSPENDED: AtomicBool = AtomicBool::new(false);
 
 /// Pause/resume the Show-Desktop watcher so it never fights our other windows.
-#[allow(dead_code)]
 pub fn suspend(on: bool) {
     SUSPENDED.store(on, Ordering::SeqCst);
 }

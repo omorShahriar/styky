@@ -159,6 +159,17 @@ pub fn hide_panel(app: AppHandle) {
 }
 
 #[tauri::command]
+pub fn hide_quickadd(app: AppHandle) {
+    crate::quickadd::hide(&app);
+}
+
+/// Rebind the quick-add hotkey (e.g. "Ctrl+Alt+N"); errors if it cannot be registered.
+#[tauri::command]
+pub fn set_quickadd_hotkey(app: AppHandle, hotkey: String) -> Res<()> {
+    crate::quickadd::rebind(&app, hotkey.trim())
+}
+
+#[tauri::command]
 pub fn quit(app: AppHandle) {
     app.exit(0);
 }

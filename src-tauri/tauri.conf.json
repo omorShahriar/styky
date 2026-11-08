@@ -26,6 +26,22 @@
         "maximizable": false,
         "minimizable": false,
         "visible": false
+      },
+      {
+        "label": "quickadd",
+        "title": "Styky quick add",
+        "width": 560,
+        "height": 64,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "alwaysOnTop": true,
+        "visible": false,
+        "focus": true
       }
     ],
     "security": {
