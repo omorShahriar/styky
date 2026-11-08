@@ -1,0 +1,73 @@
+/*
+ * Design tokens. Light is the default; dark follows the Windows app theme live
+ * through prefers-color-scheme (WebView2 tracks it). --accent is overwritten at
+ * runtime with the Windows accent colour (see lib/theme.ts).
+ */
+:root {
+  color-scheme: light dark;
+
+  /* accent (fallback until Rust reports the Windows value) */
+  --accent: #0a84ff;
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --on-accent: #fff;
+
+  /* label colours: primary / secondary / tertiary */
+  --label: rgba(0, 0, 0, 0.85);
+  --label-2: rgba(0, 0, 0, 0.55);
+  --label-3: rgba(0, 0, 0, 0.3);
+
+  /* surfaces */
+  --panel-tint: rgba(255, 255, 255, 0.55);
+  --panel-edge: rgba(0, 0, 0, 0.08);
+  --hairline: rgba(0, 0, 0, 0.08);
+  --fill: rgba(0, 0, 0, 0.05);
+  --fill-hover: rgba(0, 0, 0, 0.08);
+  --fill-press: rgba(0, 0, 0, 0.12);
+  --menu-bg: rgba(250, 250, 252, 0.88);
+  --menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+
+  /* semantic */
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --green: #34c759;
+
+  /* type */
+  --font: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", ui-monospace, Consolas, monospace;
+
+  /* radius */
+  --r-panel: 12px;
+  --r-card: 10px;
+  --r-chip: 6px;
+  --r-btn: 8px;
+
+  /* spacing (4pt grid) */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+
+  /* motion: strong ease-out for UI, never linear */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-press: 120ms;
+  --dur-pop: 160ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --label: rgba(255, 255, 255, 0.85);
+    --label-2: rgba(255, 255, 255, 0.55);
+    --label-3: rgba(255, 255, 255, 0.3);
+
+    --panel-tint: rgba(30, 30, 32, 0.5);
+    --panel-edge: rgba(255, 255, 255, 0.1);
+    --hairline: rgba(255, 255, 255, 0.08);
+    --fill: rgba(255, 255, 255, 0.07);
+    --fill-hover: rgba(255, 255, 255, 0.11);
+    --fill-press: rgba(255, 255, 255, 0.16);
+    --menu-bg: rgba(44, 44, 48, 0.88);
+    --menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  }
+}

@@ -1,0 +1,12 @@
+node_modules
+target
+dist
+dist-ssr
+*.key
+*.local
+*.log
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+src-tauri/gen/
