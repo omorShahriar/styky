@@ -18,3 +18,5 @@ src-tauri/gen/
 .t[0-9].png
 .s[0-9].png
 .tmp*.png
+.ui*.png
+.before.json

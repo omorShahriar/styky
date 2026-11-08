@@ -77,6 +77,65 @@ awkward for WebView2; not worth losing the glass.
 - Close-to-hide, single-instance (second launch re-shows the hidden panel) and restart persistence **were** verified by
   script (window message + relaunch + rect query).
 
-## Dev helpers
+## M2 notes (core list)
 
-`scripts/*.ps1` are Windows-only debugging helpers (`winpos`, `zorder`, `windtest`, `moveshot`) used for the checks above.
+Deviations / decisions:
+- **Snooze UI and the `S` key are not in M2** (they belong with the M3 SnoozeMenu). The `snooze_item` command exists and is tested.
+- **Monthly repeat drift:** within one catch-up the day-of-month is anchored (31st stays 31st), but across completions there is no
+  stored anchor (schema is fixed by the plan), so Jan 31 -> Feb 28 -> Mar 28. Fix would need an extra column (migration v2).
+- Drag-reorder applies to the trailing group of plain items (no due, not urgent), the only ones ordered by `sort_order`.
+- `react-markdown` runs through `rehype-sanitize` (GitHub schema plus `checked`); task boxes are our own buttons that call
+  `toggleTaskLine(source, line)` using the `li` node position, so exactly one source line is rewritten (vitest-covered).
+- Due picker is the native `datetime-local` input (WebView2 popup). Overdue/soon colours use darker red/orange in light mode for text contrast.
+- `Esc` in the editor reverts to the values at edit start (autosave may already have written some); `Ctrl+Enter` saves and closes.
+  A new item is created on the first save that has a title, and hidden from the list while its draft card is open.
+- Export file = `{version:1, exportedAt, items[], settings{}}` (camelCase). Merge keeps the newer `updated_at` per id; replace wipes items and settings.
+
+Not verified by hand: light theme, mouse drag-reorder, the native file dialogs behind Export/Import (the underlying commands were
+round-tripped live), and real keyboard hardware (keys were injected via CDP). CRUD, reorder, repeat roll-forward and export/replace-import
+were verified against the running app, including across a restart (see `scripts/cdp.mjs`).
+
+## Handoff (for the next implementor)
+
+**Rust modules** (`src-tauri/src/`)
+- `lib.rs` builder, plugins, setup, window events (close-to-hide, debounced state save) / `commands.rs` every `#[tauri::command]`
+- `db.rs` rusqlite store, `user_version` migrations, CRUD/complete/snooze/reorder/purge/export/import (+ tests) / `model.rs` Item, ItemEdit, ExportFile
+- `sort.rs` list order (+ tests) / `repeat.rs` next-occurrence (+ tests) / `window.rs` material, positioning, show/hide
+- `desktop.rs` z-order + Show-Desktop watcher / `theme.rs` Windows accent + watcher / `tray.rs` tray icon and menu
+
+**React** (`src/`): `app/Panel.tsx` shell, header menu, keyboard, draft card; `components/ItemRow.tsx` row + expand; `Editor.tsx` autosave editor;
+`MarkdownView.tsx`; `PlainGroup.tsx` reorder; `CompletedSection.tsx`; `Toast.tsx`; `lib/store.ts` zustand (all UI state, undo toast, check-then-complete);
+`lib/api.ts` typed invoke wrappers; `lib/time.ts`, `tags.ts`, `markdown.ts`, `motion.ts` (springs); `styles/tokens.css` design tokens.
+
+**API.** Commands: `list_items, create_item(edit), update_item(id,edit), delete_item, undelete_item(item), complete_item, restore_item, snooze_item(id,until),
+reorder(ids), get_settings, set_setting(key,value), export_json(path), import_json(path,mode), get_accent, get_autostart, set_autostart, hide_panel, quit`.
+Events: `items-changed` after every mutation, `settings-changed`, `accent-changed` (`#rrggbb`), `open-settings`. Items are camelCase JSON; times are unix ms UTC.
+Settings: only `autoclear_days` (default 7, 0 = keep). Completed items are purged lazily inside `list_items`.
+
+**Dev workflow**
+- New shells lack cargo: `$env:Path += ";$env:USERPROFILE\.cargo\bin"` (PowerShell) / `export PATH="$PATH:$HOME/.cargo/bin"` (bash).
+- Run: `pnpm tauri dev` (Rust and Vite hot-reload; touching any `src-tauri/src/*.rs` restarts the app). Test: `cargo test` (in `src-tauri`), `pnpm test` (vitest).
+  Lint: `cargo clippy --all-targets`, `pnpm tsc --noEmit`. All clean at the end of M2.
+- Drive the real webview: start dev with `$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9222"`, then
+  `node scripts/cdp.mjs eval "<js>"` / `shot out.png` / `key ArrowDown`. `scripts/seed.js` and `scripts/set.js` are paste-in helpers (seed data, set React inputs).
+  A CDP screenshot has no acrylic behind it (looks flat grey); the real window is translucent.
+- Win32 helpers: `winpos.ps1` (panel rect), `zorder.ps1 [-Top]`, `windtest.ps1` (synthetic Win+D with screenshots), `moveshot.ps1`.
+- Windows only: **no real Python** (`python3` is the Store stub and can hang). Script with Node or PowerShell. In bash, apostrophes inside heredocs
+  have broken tool calls; prefer the Write/Edit tools for files. Never broad-kill `node`/`cargo`; stop only the dev task you started.
+- The DB is `%APPDATA%\com.styky.app\styky.db`; the window state is `%APPDATA%\com.styky.app\.window-state.json`.
+
+**Gotchas**
+- **Z-order (`desktop.rs`)**: never use `HWND_BOTTOM`/`set_always_on_bottom` (hides the panel under Progman). The watcher thread (200 ms) makes the panel
+  `TOPMOST` while no ordinary app window is visible (Win+D) and drops it to just above Progman otherwise. Any new window of ours that is topmost
+  (quick-add, toast host, settings) must call `desktop::suspend(true)` while shown and `suspend(false)` when hidden, or the watcher will fight it
+  (`suspend` exists but is unused so far; it is marked `#[allow(dead_code)]`).
+- **Window state**: the plugin does not save when we `prevent_close`, so `lib.rs` saves explicitly on hide and (debounced) on move/resize.
+  `VISIBLE` and `DECORATIONS` are excluded from restore; first run (no state file) places the panel top-right.
+- **Material**: Acrylic first, Mica fallback (Mica goes flat when the window is inactive, which is nearly always for this widget).
+- `windows` crate 0.61: `BOOL` is `windows::core::BOOL`. Edition 2024 (let-chains are used).
+- Tauri permissions live in `src-tauri/capabilities/default.json`; the quick-add/settings windows will need their own capability entries.
+
+**Stubbed for later**
+- M3: scheduler (`last_fired_at` is stored but unused), toasts, snooze UI + `S` key, quick-add window + `Ctrl+Alt+N`, NL parser, `desktop::suspend` wiring.
+- M4: Settings window (header and tray `Settings...` are placeholders; tray emits `open-settings`), updater, installer, icon, motion polish, README.
+- Header `⋯` menu lacks nothing from the plan except Settings; `autoclear_days` has no UI yet.
