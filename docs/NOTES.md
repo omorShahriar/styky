@@ -228,16 +228,16 @@ Deviations / decisions:
 
 Everything Pro is in the public repo behind `license::is_pro()` (honor system).
 
-**Schema.** `user_version` is now 5. v3 = `license` table (key, instance_id, validated_at, customer; kept out of `settings` so exports never carry
+**Schema.** `user_version` is now 6 (v6 = `items.nag`, see "P-003 notes" below). v3 = `license` table (key, instance_id, validated_at, customer; kept out of `settings` so exports never carry
 the key); v4 = `items.prealert_min / pre_fired_at / last_nag_at`; v5 = `items.repeat_anchor_min` (time of day a series keeps, so a DST gap does not
 drift it). The brief said "migration v3" for escalation; the licence table landed first, so escalation is v4. `items.repeat` itself needed no
 migration: it holds the legacy value or an RRULE string (`FREQ=…;INTERVAL=…;BYDAY=…;BYMONTHDAY=…;COUNT=…;UNTIL=…`).
 
 **P1 licensing** (`license.rs`, `commands.rs`, `ProCard.tsx`, `ProPill.tsx`, `lib/pro.ts`)
 - Lemon Squeezy License API over `ureq` (blocking, 15 s timeout, `http_status_as_error(false)`), behind the `Http` trait; tests use a scripted mock.
-- `STYKY_BUY_URL`, `LEMON_STORE_ID`, `LEMON_PRODUCT_ID` are constants at the top of `license.rs`. Both ids `0` = unconfigured = no product check.
-- `PRO` is an `AtomicBool` refreshed from the DB at start, after activate/remove and by a 6-hour background thread; `pro-changed` is emitted on change.
-- Free builds cannot *set* Pro fields (`model::gate_edit`: Critical -> Urgent, pre-alert kept, custom repeat kept); values an item already has survive
+- `LEMON_STORE_ID`, `LEMON_PRODUCT_ID` are constants at the top of `license.rs`. Both ids `0` = unconfigured = no product check.
+- `PRO` is an `AtomicBool` refreshed from the local DB at start and after activate/remove (no network, no timer); `pro-changed` is emitted on change.
+- Free builds cannot *set* Pro fields (`model::gate_edit`: pre-alert kept, nag can only be kept or switched off, custom repeat kept); values an item already has survive
   unrelated edits, and a lapsed Pro keeps working repeats (only creating/changing is gated). Themes apply nothing without Pro.
 
 **P2 API / CLI / MCP** (`api.rs`, `proto.rs`, `nlp.rs`, `nlp_repeat.rs`, `cli/`)
@@ -253,7 +253,7 @@ migration: it holds the legacy value or an RRULE string (`FREQ=…;INTERVAL=…;
   "next month", month names without a day, 12-hour times without minutes before a date word in odd orders, other languages.
 
 **P3 escalation** (`scheduler.rs::plan`): three independent "already fired" markers (`last_fired_at`, `pre_fired_at`, `last_nag_at`), each written *before* the toast.
-Pre-alert: Pro, due in the future, not snoozed, once per (due time, length); a pre-alert whose window was missed is dropped. Nag: Pro, priority 3, open, main toast
+Pre-alert: Pro, due in the future, not snoozed, once per (due time, length); a pre-alert whose window was missed is dropped. Nag: Pro, `nag` flag on (any priority), open, main toast
 already fired, `max(last_fired_at, last_nag_at) + N min`; snooze clears the nag clock; repeating completion re-arms everything. The nag toast reuses the due toast's
 tag so it replaces instead of stacking. Settings: `escalation_minutes` (default 10), `escalation_bring_forward`.
 
@@ -288,4 +288,41 @@ The bundler also copies `styky-cli.exe` next to `styky.exe` (harmless duplicate,
   (2) `$_` in `bash -c` PowerShell snippets is eaten; use the PowerShell tool. (3) A dev instance next to an installed Styky must use another identifier
   (`pnpm tauri dev --config <file with {"identifier":"com.styky.dev"}>`), else single-instance hands over to the installed app and both share a DB; the Ctrl+Alt+N hotkey will then
   report "already registered". (4) `cargo test` and `tauri dev` share `target/`; cargo's lock makes a second cargo wait.
-- Owner TODO: create the Lemon Squeezy store/product/variant (license keys on, activation limit 3), then set `STYKY_BUY_URL`, `LEMON_STORE_ID`, `LEMON_PRODUCT_ID` in `license.rs`.
+- Owner TODO: create the Lemon Squeezy store/product/variant (license keys on, activation limit 3), then set `LEMON_STORE_ID`, `LEMON_PRODUCT_ID` in `license.rs`.
+
+## P-003 notes (v0.2.0 cleanup)
+
+What changed (one commit per block, all local):
+- **Gating is per feature, never per tool or command.** All seven API methods / MCP tools and every CLI command work on Free. A request that uses a Pro feature is refused on
+  its own with `proto::ApiError::requires_pro(feature)`: code `requires_pro`, `data {feature, url}`, message `<Feature> is a Styky Pro feature: https://styky.smallhingelabs.com/pro`.
+  CLI prints that sentence (no `styky:` prefix) and exits 3; MCP returns `isError: true` with `structuredContent {code, feature, url}` (every MCP tool error now carries its `code`).
+  Gated today: **Advanced repeats** (`api::repeat_is_advanced`, which is `!repeat::is_simple`: anything but none / daily / weekdays / weekly / monthly, including a repeat parsed out of
+  the `text` sentence), **Nagging** (`nag` param; `styky edit --nag on|off`; switching it off is always allowed), and the pre-existing single pre-alert (reported as "Early warnings"; see below).
+  **GitHub watch** is not built, so there is no field to gate yet: add the check next to the new fields when it lands (`api::FEATURE_*` constants, `requires_pro()`).
+- **Critical is free** everywhere (editor, `!!!`, API/CLI/MCP). `gate_edit` no longer downgrades it.
+- **Nagging** is `items.nag` (migration v6, `user_version` 6, default 0 for every row, never derived from priority). Scheduler: nags only if `nag` and `license::is_pro()`. The old
+  Critical-based nag did not ship (v0.1.0 has no Pro), so there was nothing to migrate. Editor has a "Nag" select (Pro pill on Free); Settings group is now "Nagging".
+  `nag` is accepted by the API/CLI but deliberately **not advertised in the MCP tool schemas** (product context: no Pro settings through MCP until told); an MCP client that sends it is gated like the CLI.
+- **License**: `license.rs` has no clock. One request on Activate (explicit rejection is shown; offline/failed/unreadable accepts a well-formed key, `is_well_formed`: 16-100 chars of
+  `[A-Za-z0-9_-]`, at least 16 alphanumerics, so a Lemon Squeezy UUID passes), one on Remove (none for an offline-accepted key, whose `instance_id` is empty). No thread, no startup call. Test
+  `only_the_two_click_handlers_may_reach_the_network` fails if `UreqHttp` / `license::activate` / `deactivate` appear outside `commands.rs`. The `license` table keeps its column names
+  (`validated_at` now means "when accepted"). There is no Buy button; the Pro card links "Get Pro" to `https://styky.smallhingelabs.com/pro` (`lib/pro.ts` `PRO_URL`), as does every Pro pill.
+- **About** shows `lib/network.ts` `NETWORK_STATEMENT`; `network.test.ts` compares it byte-for-byte with docs/PRIVACY.md, the README and `site/src/config.ts`.
+- **Docs**: PRO.md, LEMONSQUEEZY.md and STORE.md are untracked + gitignored (still on disk; history not rewritten). STORE.md's engineering content is in RELEASING.md ("Microsoft Store (MSIX) build").
+- **MSIX**: the template holds the real Name and Publisher; `build-msix.ps1 -Store` uses them, a plain run swaps in a test identity; `-PublisherDisplayName` defaults to `omor.dev`.
+  Verified only by parsing the script and rendering the manifest in both modes (nothing was built or submitted). The submitted package's manifest could not be diffed: no `.msix` exists on disk.
+- **v0.2.0**: versions bumped in `package.json`, `src-tauri/Cargo.toml` (+ lock) and `tauri.conf.json`; `site/` is untouched (it reads release data at build time). `CHANGELOG.md` and `docs/release-notes/v0.2.0.md`.
+  `latest-json.mjs` prints the four files to upload.
+
+Gotchas:
+- `scripts/build.ps1` fails with a `NativeCommandError` if its output is redirected from Windows PowerShell 5.1 with `*>` (cargo writes progress to stderr and the script sets `$ErrorActionPreference = "Stop"`).
+  Run it in a normal console, or `powershell -File scripts\build.ps1 > log 2>&1` from a POSIX shell.
+- The local-test MSIX build and the Store build share one template now; do not hand-edit the Identity line except to change the real identity.
+- Older sections above (P1-P3, "Verified live") describe behaviour before P-003 where they mention Critical-based nagging, tool-level gating, revalidation or the 30-day grace; this section wins.
+
+Stubbed / not done:
+- GitHub watch fields do not exist, so nothing is gated for them. Early warnings are unchanged: still one lead time (5 min to 1 day), Pro-only; the API refuses `prealert` on Free as "Early warnings".
+- Nagging versus the product spec: nags are **uncapped** (no cap setting), **one toast per item** (no grouping), there is **no Do Not Disturb** handling, and the interval choices are 5/10/15/30/60 min.
+  These are for the "Nagging alignment" prompt.
+- Not run: the installer, the MSIX, anything in a Claude desktop session. No live screenshot of the new Nag control or the About text.
+- Built (not installed): `scripts\build.ps1` produced `Styky_0.2.0_x64-setup.exe` (5.4 MB) and its `.sig`; `node scripts/latest-json.mjs 0.2.0 "<notes>"` wrote `latest.json` and `Styky_x64-setup.exe` and listed all four upload files. Regenerate `latest.json` with the real notes before uploading (the one from the build check used placeholder notes).
