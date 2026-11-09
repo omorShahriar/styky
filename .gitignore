@@ -27,3 +27,4 @@ dist-msix*/
 *.msix
 *.cer
 dist-store/
+private/
