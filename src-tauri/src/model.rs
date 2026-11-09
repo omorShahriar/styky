@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 pub const PRIORITY_LOW: i64 = 0;
 pub const PRIORITY_URGENT: i64 = 2;
-/// Pro: critical items keep re-notifying (see `scheduler`).
+/// Free like every other priority. (Re-notifying an item is the separate, per-item Pro "nag" flag.)
 pub const PRIORITY_CRITICAL: i64 = 3;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -99,15 +99,12 @@ pub fn normalize_prealert(p: Option<i64>) -> Option<i64> {
     p.filter(|m| PREALERTS.contains(m))
 }
 
-/// Free builds cannot set Pro-only fields: Critical falls back to Urgent and pre-alerts keep their old
-/// value (none for a new item). Values an item already has are never taken away by an unrelated edit.
+/// Free builds cannot set Pro-only fields: pre-alerts keep their old value (none for a new item) and advanced
+/// repeats are not accepted. Every priority, Critical included, is free. Values an item already has are never
+/// taken away by an unrelated edit.
 pub fn gate_edit(edit: &mut ItemEdit, existing: Option<&Item>, pro: bool) {
     if pro {
         return;
-    }
-    let had_critical = existing.is_some_and(|i| i.priority == PRIORITY_CRITICAL);
-    if edit.priority >= PRIORITY_CRITICAL && !had_critical {
-        edit.priority = PRIORITY_URGENT;
     }
     edit.prealert_min = existing.and_then(|i| i.prealert_min);
     // Advanced repeats (intervals, chosen weekdays, nth weekday, COUNT/UNTIL) are Pro; the simple ones stay free.

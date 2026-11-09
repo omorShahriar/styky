@@ -106,7 +106,7 @@ uses a Pro feature (an advanced repeat such as `FREQ=WEEKLY;INTERVAL=2`) is refu
 styky add "Deploy api fri 5pm #infra !!"
 styky ls --today
 styky ls --overdue --tag infra --json
-styky add "Rotate prod keys fri 10am #infra !!!"    # !!! = Critical (Pro); free builds treat it as Urgent
+styky add "Rotate prod keys fri 10am #infra !!!"    # !!! = Critical
 styky done a1b2c3d4
 ```
 

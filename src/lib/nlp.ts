@@ -3,7 +3,7 @@
  *
  * Grammar (tokens can appear anywhere in the line):
  *   #tag               tag / project
- *   !!!                critical (priority 3, Pro: free builds fall back to urgent)
+ *   !!!                critical (priority 3)
  *   !!                 urgent (priority 2)
  *   !                  explicit "normal" (priority 1, which is also the default; the chip confirms it was seen)
  *   !low               low (priority 0)

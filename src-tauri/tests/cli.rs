@@ -73,11 +73,11 @@ async fn free_tier_runs_every_command_and_refuses_only_the_pro_feature() {
         assert!(o.status.success() && stdout(&o).contains("Release v2.3"), "{}", stderr(&o));
         let o = cli(&u, &["snooze", &id, "3h"]);
         assert!(o.status.success(), "{}", stderr(&o));
-        let o = cli(&u, &["edit", &id, "--title", "Release v2.4", "--priority", "urgent", "--repeat", "weekly"]);
+        let o = cli(&u, &["edit", &id, "--title", "Release v2.4", "--priority", "critical", "--repeat", "weekly"]);
         assert!(o.status.success(), "{}", stderr(&o));
         let o = cli(&u, &["get", &id, "--json"]);
         let v: Value = serde_json::from_str(&stdout(&o)).unwrap();
-        assert_eq!((v["priority"].as_str(), v["repeat"].as_str()), (Some("urgent"), Some("weekly")));
+        assert_eq!((v["priority"].as_str(), v["repeat"].as_str()), (Some("critical"), Some("weekly")));
 
         // A Pro feature is refused on its own: exit 3, one sentence on stderr, nothing changed.
         let o = cli(&u, &["edit", &id, "--title", "should not stick", "--repeat", "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO"]);
@@ -160,8 +160,8 @@ async fn mcp_server_speaks_stdio_end_to_end() {
         let id = add["result"]["structuredContent"]["shortId"].as_str().unwrap().to_string();
         let get = rpc(json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"styky_get","arguments":{"id": id}}}));
         assert_eq!(get["result"]["isError"], false, "{get}");
-        let upd = rpc(json!({"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"styky_update","arguments":{"id": id, "priority": "urgent"}}}));
-        assert_eq!((upd["result"]["isError"].clone(), upd["result"]["structuredContent"]["priority"].clone()), (json!(false), json!("urgent")), "{upd}");
+        let upd = rpc(json!({"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"styky_update","arguments":{"id": id, "priority": "critical"}}}));
+        assert_eq!((upd["result"]["isError"].clone(), upd["result"]["structuredContent"]["priority"].clone()), (json!(false), json!("critical")), "{upd}");
         // A Pro feature is refused on its own, with a machine-readable code.
         let gated = rpc(json!({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"styky_update","arguments":{"id": id, "repeat": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO"}}}));
         assert_eq!(gated["result"]["isError"], true);

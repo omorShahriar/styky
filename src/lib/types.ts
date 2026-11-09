@@ -1,6 +1,6 @@
 /** `none`, a free simple value (daily | weekdays | weekly | monthly) or, with Pro, an RRULE-like string (see rrule.ts). */
 export type Repeat = string;
-/** 0 low, 1 normal, 2 urgent, 3 critical (Pro: keeps re-notifying) */
+/** 0 low, 1 normal, 2 urgent, 3 critical (all free) */
 export type Priority = 0 | 1 | 2 | 3;
 
 export interface Item {

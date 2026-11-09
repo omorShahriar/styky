@@ -833,14 +833,14 @@ mod tests {
     }
 
     #[test]
-    fn gate_edit_keeps_pro_fields_out_of_free_builds() {
+    fn gate_edit_keeps_pro_fields_out_of_free_builds_but_every_priority_is_free() {
         use crate::model::gate_edit;
         let mut e = edit("x");
         e.priority = 3;
         e.prealert_min = Some(15);
         gate_edit(&mut e, None, false);
-        assert_eq!((e.priority, e.prealert_min), (2, None));
-        // An item that is already critical / has a pre-alert keeps them through unrelated edits.
+        assert_eq!((e.priority, e.prealert_min), (3, None), "Critical is free; the pre-alert is not");
+        // An item that has a pre-alert keeps it through unrelated edits.
         let mut existing = Item::blank("i");
         existing.priority = 3;
         existing.prealert_min = Some(30);

@@ -144,9 +144,6 @@ fn add(ctx: &Ctx, p: &Value) -> Out {
     if !ctx.pro && prealert.is_some() {
         return Err(requires_pro(FEATURE_EARLY_WARNINGS));
     }
-    if !ctx.pro && q.priority >= 3 && p.get("priority").is_some() {
-        return Err(requires_pro("Critical priority")); // removed in B2
-    }
     let mut edit = ItemEdit {
         title: q.title,
         body_md: str_field(p, "notes").unwrap_or("").to_string(),
@@ -731,14 +728,17 @@ mod tests {
     }
 
     #[test]
-    fn critical_and_prealert_are_pro_in_the_api_too() {
+    fn critical_is_free_and_the_prealert_is_pro_in_the_api() {
         let db = Db::open_memory().unwrap();
-        // Explicitly asking a free build for them is an error...
-        assert_eq!(run(&db, false, "add", json!({"title": "x", "priority": "critical"})).unwrap_err().code, REQUIRES_PRO);
-        assert_eq!(run(&db, false, "add", json!({"title": "x", "due": "1h", "prealert": "15m"})).unwrap_err().code, REQUIRES_PRO);
-        // ...while the `!!!` token in free text degrades to Urgent.
-        assert_eq!(add(&db, "ship it !!!")["priority"], "urgent");
-        // Pro: both work, and update can change them.
+        // Critical works on Free by field, by update and by the `!!!` token in text.
+        assert_eq!(run(&db, false, "add", json!({"title": "x", "priority": "critical"})).unwrap()["priority"], "critical");
+        assert_eq!(add(&db, "ship it !!!")["priority"], "critical");
+        let id = add(&db, "plain")["id"].as_str().unwrap().to_string();
+        assert_eq!(run(&db, false, "update", json!({"id": id, "priority": "critical"})).unwrap()["priority"], "critical");
+        // The old single pre-alert is still Pro (Early warnings are decided separately).
+        let e = run(&db, false, "add", json!({"title": "x", "due": "1h", "prealert": "15m"})).unwrap_err();
+        assert_eq!((e.code.as_str(), e.message.as_str()), (REQUIRES_PRO, "Early warnings is a Styky Pro feature: https://styky.smallhingelabs.com/pro"));
+        // Pro: it works, and update can change it.
         let r = run(&db, true, "add", json!({"title": "x", "due": "2h", "priority": "critical", "prealert": "30m"})).unwrap();
         assert_eq!((r["priority"].as_str(), r["prealertMin"].as_i64()), (Some("critical"), Some(30)));
         let u = run(&db, true, "update", json!({"id": r["id"], "prealert": null})).unwrap();
