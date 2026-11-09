@@ -35,6 +35,9 @@ function seed(): Item[] {
     createdAt: now - (30 - n) * HOUR,
     updatedAt: now,
     repeatAnchorDay: null,
+    prealertMin: null,
+    preFiredAt: null,
+    lastNagAt: null,
     ...o,
   });
   return [
@@ -160,6 +163,8 @@ export const db = {
       status: "open",
       snoozedUntil: null,
       lastFiredAt: null,
+      preFiredAt: null,
+      lastNagAt: null,
       completedAt: null,
       sortOrder: Math.max(0, ...items.map((i) => i.sortOrder)) + 1,
       createdAt: now,

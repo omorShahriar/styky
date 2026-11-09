@@ -27,11 +27,22 @@ export const config = {
     (import.meta.env.VITE_LS_CHECKOUT_URL as string | undefined) ||
     `https://YOURSTORE.lemonsqueezy.com/buy/${CHECKOUT_PLACEHOLDER}`,
 
-  /** Early-bird pre-order price, and the price once Pro v1 ships (USD). */
+  /** Early-bird price, and the regular price after it (USD). */
   priceEarly: 4.99,
   priceRegular: 6.99,
 } as const;
 
 export const checkoutReady = !config.checkoutUrl.includes(CHECKOUT_PLACEHOLDER);
 
-export const money = (n: number) => `$${n.toFixed(2)}`;
+/** The release that introduced Pro, the CLI and the MCP server. */
+export const proVersion = "0.2.0";
+
+/** True when `version` ("0.2.1", "v0.3.0") is `min` or newer. Compares numeric parts only. */
+export function versionAtLeast(version: string, min: string): boolean {
+  const n = (v: string) => v.replace(/^v/, "").split(/[.-]/).slice(0, 3).map((x) => parseInt(x, 10) || 0);
+  const [a, b] = [n(version), n(min)];
+  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  return true;
+}
+
+export const money =(n: number) => `$${n.toFixed(2)}`;

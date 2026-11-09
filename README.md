@@ -4,18 +4,24 @@
 
 # Styky
 
-**The reminders you can't afford to forget, always on your desktop.**
+**Reminders you control from Claude, your terminal and git hooks.**
 
-A small, glassy Windows 11 widget for those one-off but crucial things: *release `release/2.3` on Friday*, *rotate the API keys*,
-*reply to the client before 5*. It sits on your desktop behind your windows, nudges you with a native notification when
-something is due, and stays out of the way the rest of the time.
+A free, open-source Windows reminder widget with a local CLI and MCP server. Add a reminder with `Ctrl+Alt+N`,
+`styky add "Deploy api fri 5pm #infra !!"` or a git hook. Get a native notification when it is due, and let
+Critical reminders (Pro) keep nagging until you act. The always-visible glass panel on your desktop shows what is
+coming. Local-first: no account, no cloud, no telemetry.
+
+```powershell
+styky add "Deploy api fri 5pm #infra !!"      # free
+claude mcp add styky -- styky mcp             # free: add + list; Pro: complete, snooze, edit, delete
+```
 
 [![Latest release](https://img.shields.io/github/v/release/omorShahriar/styky?label=download&color=7c5cff)](https://github.com/omorShahriar/styky/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078d4?logo=windows11&logoColor=white)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white)
 
-[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.pages.dev/) · [Features](#features) · [Quick add](#quick-add-type-it-like-you-say-it) · [Build from source](#build-from-source)
+[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.pages.dev/) · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal) · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
 
 </div>
 
@@ -24,14 +30,14 @@ something is due, and stays out of the way the rest of the time.
 ## Why Styky?
 
 Task managers are great for projects, but the most dangerous tasks are the small, single ones that live only in your head
-until it's too late. Styky is designed around three ideas:
+until it's too late: *deploy on Friday*, *rotate the keys*, *check CI after the push*. Styky is built around three ideas:
 
-- **Always visible.** One frosted-glass panel lives *on the desktop layer*, behind your apps, so you see it every time
-  you glance at your desktop, even after Win+D.
-- **Capture in two seconds.** Press `Ctrl+Alt+N` anywhere, type `Release v2.3 tomorrow 5pm #api !!`, hit Enter. Done.
-- **Nudges, not nagging.** A native Windows notification fires on time, with **Done** and **Snooze** right on it.
-
-It's local-first: no account, no cloud, no telemetry. Your reminders stay in a SQLite file on your machine.
+- **Set it from anywhere.** `Ctrl+Alt+N` from any app, `styky add` from a terminal or git hook, or ask Claude through MCP.
+  They all share one grammar: `Deploy api fri 5pm #infra !!`.
+- **It nags until it is done.** A native Windows notification fires on time with **Done** and **Snooze** on it. With Pro, a
+  Critical reminder (`!!!`) re-notifies every 10 minutes (configurable) until you complete or snooze it.
+- **Visible and local.** One frosted-glass panel lives on the desktop layer behind your windows. Reminders sit in a SQLite
+  file on your machine, and the local API is a named pipe only your Windows user can open.
 
 ## Features
 
@@ -54,14 +60,117 @@ It's local-first: no account, no cloud, no telemetry. Your reminders stay in a S
 and run it.
 
 - It installs **per user**, with no admin prompt, and adds a Start menu entry.
+- From v0.2.0 the installer also puts the `styky` command on your user `PATH` (open a new terminal afterwards).
 - Styky starts at login by default. You can change that in Settings.
 - Requires Windows 10 1809+ / Windows 11 (the WebView2 runtime is already part of Windows 11).
-- **Microsoft Store:** coming soon (see [docs/STORE.md](docs/STORE.md) for the packaging flow).
+- **Microsoft Store:** a listing is in review (see [docs/STORE.md](docs/STORE.md)). The Store build does not include the `styky` CLI or MCP server yet; use the GitHub installer for those.
 
 > Windows SmartScreen may warn about an unrecognized app because the installer isn't Authenticode-signed yet. Click
 > **More info → Run anyway**. Updates are cryptographically signed and verified by the app itself.
 
 Uninstall from *Settings → Apps → Installed apps → Styky*. Your data is kept (see [Your data](#your-data)).
+
+## Use it from Claude, ChatGPT and the terminal
+
+*New in v0.2.0.* Styky ships a `styky` command and a local MCP server. Both talk to the **running** Styky app over a
+named pipe (`\\.\pipe\styky-<username>`) whose access is limited to your Windows account; nothing listens on the network.
+If Styky is not running you get `Styky isn't running` and exit code 2.
+
+### Install
+
+Install Styky from the [GitHub installer](https://github.com/omorShahriar/styky/releases/latest) (v0.2.0 or newer). It
+adds `<install dir>\bin\styky.exe` to your user `PATH`. Check with:
+
+```powershell
+styky --version
+```
+
+### CLI
+
+| Command | What it does | Tier |
+|---|---|---|
+| `styky add <text...> [--json]` | Add a reminder from a natural-language line (same grammar as `Ctrl+Alt+N`) | Free |
+| `styky ls [--today \| --overdue] [--tag <t>] [--done \| --all] [--json]` | List reminders (open by default) | Free |
+| `styky get <id> [--json]` | Show one reminder with its notes | **Pro** |
+| `styky done <id>` | Complete it (a repeating reminder rolls to its next time) | **Pro** |
+| `styky snooze <id> <when>` | e.g. `1h`, `30m`, `"tomorrow 9am"` | **Pro** |
+| `styky edit <id> [--title t] [--due when\|none] [--tag t] [--priority low\|normal\|urgent\|critical] [--notes n] [--repeat r] [--link u] [--branch b]` | Change fields | **Pro** |
+| `styky rm <id>` | Delete it | **Pro** |
+| `styky mcp` | Run the MCP server on stdio | Free (tools below are tiered) |
+
+`<id>` is the 8-character id shown by `styky ls`; any unique prefix works. Pro commands on a free build print
+`requires Styky Pro` and exit with code 3.
+
+```powershell
+styky add "Deploy api fri 5pm #infra !!"
+styky ls --today
+styky ls --overdue --tag infra --json
+styky add "Rotate prod keys fri 10am #infra !!!"    # !!! = Critical (Pro); free builds treat it as Urgent
+styky done a1b2c3d4                                 # Pro
+```
+
+### Git hook
+
+Git has no client-side `post-push` hook, so use `pre-push`. Save this as `.git/hooks/pre-push` (Git for Windows runs it
+as is). It queues a CI check for the branch as you push; if the push is rejected, the reminder is still there to dismiss.
+
+```sh
+#!/bin/sh
+branch=$(git rev-parse --abbrev-ref HEAD)
+styky add "Check CI in 15m #ci @$branch" || true
+exit 0
+```
+
+### MCP server
+
+`styky mcp` is a stdio MCP server (protocol versions 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05 are accepted). It
+exposes seven tools:
+
+| Tool | Purpose | Tier |
+|---|---|---|
+| `styky_add` | Add a reminder from `text` (natural language) or explicit fields: `title`, `due`, `tag`, `priority` (`low`/`normal`/`urgent`/`critical`), `repeat`, `notes`, `link`, `branch` | Free |
+| `styky_list` | List reminders; filter by `due` (`today`/`overdue`/`any`), `tag`, `status` (`open`/`done`/`all`) | Free |
+| `styky_get` | One reminder with all fields, including notes | **Pro** |
+| `styky_complete` | Mark done (repeating reminders roll forward) | **Pro** |
+| `styky_snooze` | Notify again at a given time | **Pro** |
+| `styky_update` | Change fields; `due: null` clears the due time | **Pro** |
+| `styky_delete` | Permanently delete | **Pro** |
+
+Pro tools on a free build return a plain `requires_pro` error that the assistant can relay.
+
+**Claude Code**
+
+```powershell
+claude mcp add styky -- styky mcp
+```
+
+**Claude Desktop**: add to `claude_desktop_config.json` (Settings, Developer, Edit Config) and restart Claude:
+
+```json
+{
+  "mcpServers": {
+    "styky": {
+      "command": "styky",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Other MCP clients** (Cursor, VS Code, Codex and anything that can launch a local stdio server): command `styky`,
+argument `mcp`. For example:
+
+```json
+{ "styky": { "type": "stdio", "command": "styky", "args": ["mcp"] } }
+```
+
+Settings → **Connect AI** in the app shows the same snippets with a copy button.
+
+**ChatGPT** only connects to remote HTTPS MCP servers today, so it cannot launch a local one such as `styky mcp`. A local HTTP
+endpoint for it is on the roadmap and not shipped. Until then, use the CLI from scripts or any client that can run a local command.
+
+> Privacy note: what an assistant reads through these tools (titles, due times, notes) goes to that assistant. Connect only
+> clients you trust. Styky itself sends nothing anywhere.
 
 ## Using Styky
 
@@ -109,8 +218,23 @@ Merge @release/2.3 in 2h
 ## Your data
 
 - Reminders are stored in `%APPDATA%\com.styky.app\styky.db` (SQLite) on your machine and nowhere else.
-- Settings → Data → **Export** creates a plain JSON backup, and **Import** can merge or replace.
-- Styky only touches the network when you click **Check for updates**, which queries this repository's releases.
+- Settings → Data → **Export** creates a plain JSON backup, and **Import** can merge or replace. Exports never contain your Pro license key.
+- Styky only touches the network when you click **Check for updates** (it queries this repository's releases) or when you
+  activate or re-validate a Pro license key (Lemon Squeezy's license API; no personal data is sent).
+
+## Styky Pro
+
+Styky stays free and MIT-licensed, and nothing that was free becomes paid. **Styky Pro** is an optional one-time unlock
+(early-bird **$4.99**, then **$6.99**, no subscription, one key for about three of your own PCs):
+
+- the rest of the CLI and MCP tools: `get`, `done`, `snooze`, `edit`, `rm`
+- **Critical** reminders that re-notify until you act, and pre-alerts (5 minutes to 1 day before)
+- advanced repeats (every 2 weeks, Mon/Wed/Fri, the last Friday of the month, end after N times or on a date)
+- themes (tint, transparency, density, accent, paper skin, font size)
+
+It runs on the honor system: the code is in this repo behind a license check, and you can build it yourself. Buying supports
+the project and gets you the signed, auto-updating build. Details and checkout: **[styky.pages.dev/#pricing](https://styky.pages.dev/#pricing)**.
+Design notes: [docs/PRO.md](docs/PRO.md).
 
 ## Known limitations
 

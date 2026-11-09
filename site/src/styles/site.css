@@ -1001,3 +1001,91 @@ kbd {
 .x-example {
   overflow-wrap: anywhere;
 }
+
+/* ---------- connect (CLI / MCP) ---------- */
+.x-snips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+.x-snips > * {
+  min-width: 0;
+}
+.x-snip h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.x-snip p {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: var(--label-2);
+}
+.x-snip .x-snip-sub {
+  margin-top: 18px;
+}
+.x-snip code,
+.x-chat code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+.x-code {
+  position: relative;
+  margin-top: 14px;
+}
+.x-code .x-term {
+  margin-top: 0;
+  padding-right: 84px;
+}
+.x-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 8px;
+  font: 600 12px/1 var(--font);
+  color: #e8e8ea;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+}
+.x-copy:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.x-tier {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font: 600 11.5px/1.6 var(--font);
+  letter-spacing: 0;
+  vertical-align: 1px;
+}
+.x-tier.free {
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  color: var(--label);
+}
+.x-tier.pro {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent-text);
+}
+.x-hero-term {
+  max-width: 560px;
+  margin: 28px auto 0;
+  text-align: left;
+}
+@media (max-width: 960px) {
+  .x-snips {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .x-chat {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.x-term {
+  max-width: 100%;
+}

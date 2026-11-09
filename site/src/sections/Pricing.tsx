@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Check, Download, Hourglass, ShieldCheck } from "lucide-react";
-import { checkoutReady, config, money } from "../config";
+import { checkoutReady, config, money, proVersion, versionAtLeast } from "../config";
 import { Reveal, SectionHead, useRelease } from "./util";
 
 declare global {
@@ -40,7 +40,7 @@ function BuyButton() {
   return (
     <>
       <a className="x-btn primary lemonsqueezy-button" href={href}>
-        Pre-order for {money(config.priceEarly)}
+        Get Pro for {money(config.priceEarly)}
       </a>
       <p className="x-buy-hint">Secure checkout by Lemon Squeezy. One-time payment, no subscription.</p>
     </>
@@ -51,38 +51,38 @@ const FREE = [
   "The glass desktop panel, light and dark",
   "Natural-language quick add, from anywhere",
   "Native notifications with Snooze and Done",
+  "styky add and styky ls, and the MCP tools styky_add and styky_list",
   "Daily, weekday, weekly and monthly repeats",
-  "Markdown notes and tickable checklists",
-  "Tags, branch chips and links",
+  "Markdown notes, tickable checklists, tags, branch chips, links",
   "JSON export and import",
   "Unlimited reminders",
-  "Basic CLI and AI capture (add, list), arriving with Pro v1",
 ];
 
 const PRO: { t: string; d: string }[] = [
   {
-    t: "Local API, CLI and MCP server",
-    d: "styky add, ls, done, snooze, update and delete, plus bulk actions and filters. Connect Claude, ChatGPT or any MCP client.",
+    t: "Full CLI and MCP control",
+    d: "styky get, done, snooze, edit and rm, and the matching MCP tools, so Claude can complete and reschedule too.",
   },
   {
-    t: "Escalating reminders and pre-alerts",
-    d: "Heads-up 5 minutes to 1 day before. Urgent items re-notify until you are done, with an optional sound. A new Critical priority.",
-  },
-  {
-    t: "Themes",
-    d: "Panel tint and transparency, comfortable or compact density, accent override, a sticky-note paper skin, font size.",
+    t: "Critical reminders and pre-alerts",
+    d: "!!! re-notifies every N minutes (default 10) until you act. Heads-up toasts 5 minutes to 1 day before.",
   },
   {
     t: "Advanced repeats",
     d: "Every 2 weeks, Mon/Wed/Fri, the last Friday of the month, end after N times or on a date.",
   },
+  {
+    t: "Themes",
+    d: "Panel tint and transparency, comfortable or compact density, accent override, a paper skin, font size.",
+  },
   { t: "All future Pro features", d: "One key covers about three of your own PCs. Works offline after activation." },
 ];
 
 export function Pricing() {
-  const { url } = useRelease();
+  const { url, version } = useRelease();
+  const shipped = versionAtLeast(version, proVersion);
   return (
-    <section className="x-section" id="pricing">
+    <section className="x-section alt" id="pricing">
       <div className="x-wrap">
         <SectionHead
           eyebrow="Pricing"
@@ -115,12 +115,12 @@ export function Pricing() {
           <Reveal delay={80}>
             <div className="x-card x-plan pro" style={{ height: "100%" }}>
               <div className="x-plan-name">
-                Styky Pro <span className="x-badge">Early-bird pre-order</span>
+                Styky Pro <span className="x-badge">Early-bird price</span>
               </div>
               <div className="x-amount">
                 <strong>{money(config.priceEarly)}</strong>
                 <span>
-                  one-time &middot; becomes {money(config.priceRegular)} when Pro v1 ships
+                  one-time &middot; becomes {money(config.priceRegular)} after the early-bird period
                 </span>
               </div>
               <p className="x-plan-sub">Everything in Free, plus:</p>
@@ -138,14 +138,23 @@ export function Pricing() {
               <div className="x-note">
                 <Hourglass size={18} strokeWidth={2} />
                 <span>
-                  <b>Ships in an upcoming update.</b> Pro v1 is being built now. Pre-order at the early-bird price and
-                  your license key unlocks it the day it ships.
+                  {shipped ? (
+                    <>
+                      <b>Included in v{proVersion} and later.</b> Buy a key, paste it in Settings, Styky Pro.
+                    </>
+                  ) : (
+                    <>
+                      <b>Arrives in v{proVersion}.</b> Buy now at the early-bird price and the key unlocks Pro when
+                      v{proVersion} is out.
+                    </>
+                  )}
                 </span>
               </div>
               <div className="x-note" style={{ background: "color-mix(in srgb, var(--green) 12%, transparent)" }}>
                 <ShieldCheck size={18} strokeWidth={2} style={{ color: "var(--green)" }} />
                 <span>
-                  <b>Full refund if Pro doesn&rsquo;t ship.</b> No questions asked.
+                  <b>Honor system, no DRM.</b> The Pro code is in the public repo. You pay for the signed build and to
+                  keep it maintained.
                 </span>
               </div>
               <BuyButton />
@@ -153,31 +162,6 @@ export function Pricing() {
           </Reveal>
         </div>
 
-        <Reveal delay={60}>
-          <div className="x-card x-chat">
-            <div>
-              <p className="x-eyebrow">Pro &middot; Claude &amp; ChatGPT</p>
-              <h3 style={{ fontSize: 26, lineHeight: 1.2, letterSpacing: "-0.025em", fontWeight: 650 }}>
-                &ldquo;Remind me to rotate the keys on Friday.&rdquo;
-              </h3>
-              <p style={{ marginTop: 12, fontSize: 16, color: "var(--label-2)" }}>
-                Pro ships a small local API, a <code>styky</code> command line and an MCP server, so the assistant
-                you already use can add and manage your reminders. It all stays on your machine.
-              </p>
-              <div className="x-term" aria-label="Example commands">
-                <i>$ </i>styky add &quot;Rotate keys fri 10am #infra !!&quot;{"\n"}
-                <i>$ </i>styky ls --due today --json{"\n"}
-                <i>$ </i>styky done 4
-              </div>
-            </div>
-            <div className="x-chat-box" role="img" aria-label="Illustration: asking an AI assistant to add a Styky reminder">
-              <div className="x-bubble me">Remind me to rotate the keys on Friday at 10, it&rsquo;s urgent.</div>
-              <div className="x-tool">styky.add &#123; title: &quot;Rotate the keys&quot;, due: &quot;fri 10:00&quot;, priority: urgent &#125;</div>
-              <div className="x-bubble ai">Added &ldquo;Rotate the keys&rdquo; for Friday at 10:00, marked urgent.</div>
-              <p className="x-caption-sm">Illustration of the planned MCP connector. Arrives with Pro v1.</p>
-            </div>
-          </div>
-        </Reveal>
       </div>
     </section>
   );

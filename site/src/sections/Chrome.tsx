@@ -41,8 +41,9 @@ export function Nav() {
           Styky
         </a>
         <nav className="x-nav-links" aria-label="Sections">
-          <a href="#features">Features</a>
+          <a href="#connect">Claude &amp; CLI</a>
           <a href="#quick-add">Quick add</a>
+          <a href="#features">Features</a>
           <a href="#privacy">Privacy</a>
           <a href="#pricing">Pricing</a>
           <a href="#faq">FAQ</a>
@@ -70,11 +71,12 @@ export function Hero() {
       <div className="x-wrap">
         <div className="x-hero-copy">
           <h1 className="x-h1">
-            The reminders you can&rsquo;t afford <em>to forget.</em>
+            Reminders you control from <em>Claude, your terminal and git hooks.</em>
           </h1>
           <p className="x-lead">
-            Styky is a small, glassy widget that lives on your Windows desktop. Type it like you say it, and get a
-            native nudge right on time.
+            Styky is a free, open-source Windows reminder widget with a local CLI and MCP server. Add from anywhere with
+            Ctrl+Alt+N or <code>styky add</code>, get a native notification, and let Critical reminders (Pro) keep
+            nagging until you act.
           </p>
           <div className="x-cta">
             <a className="x-btn primary" href={url} rel="noopener">
@@ -85,9 +87,16 @@ export function Hero() {
               {stars != null && stars >= 10 ? <span className="tnum">{stars.toLocaleString()}</span> : null}
               <span>{stars != null && stars >= 10 ? "stars on GitHub" : "Star on GitHub"}</span>
             </a>
+            <a className="x-btn secondary" href="#connect">
+              See the commands
+            </a>
           </div>
+          <pre className="x-term x-hero-term" aria-label="Example commands">
+            <i>$ </i>styky add &quot;Deploy api fri 5pm #infra !!&quot;{"\n"}
+            <i>$ </i>claude mcp add styky -- styky mcp
+          </pre>
           <p className="x-meta">
-            Free and open source · v{version} · Windows 10 &amp; 11 · Per-user install, no admin prompt
+            Free and open source (MIT) · v{version} · Windows 10 &amp; 11 · Per-user install, no admin prompt
           </p>
         </div>
         <Suspense fallback={<div className="x-demo-skeleton" aria-hidden />}>

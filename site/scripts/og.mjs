@@ -48,12 +48,13 @@ const svg = `
     <svg width="64" height="64" viewBox="0 0 1024 1024">${icon}</svg>
     <text x="84" y="46" font-family="${font}" font-size="38" font-weight="700" fill="#fff" letter-spacing="-1">Styky</text>
   </g>
-  <text font-family="${font}" font-size="64" font-weight="700" fill="#fff" letter-spacing="-2.5">
-    <tspan x="80" y="270">The reminders you</tspan>
-    <tspan x="80" y="342">can&#8217;t afford to forget.</tspan>
+  <text font-family="${font}" font-size="54" font-weight="700" fill="#fff" letter-spacing="-2">
+    <tspan x="80" y="222">Reminders you control</tspan>
+    <tspan x="80" y="286">from Claude, your</tspan>
+    <tspan x="80" y="350">terminal and git hooks.</tspan>
   </text>
-  <text x="80" y="410" font-family="${font}" font-size="26" fill="rgba(255,255,255,0.72)">A glassy Windows 11 desktop reminder widget.</text>
-  <text x="80" y="446" font-family="${font}" font-size="26" fill="rgba(255,255,255,0.72)">Type it like you say it. Local-first. Open source.</text>
+  <text x="80" y="408" font-family="Consolas, Cascadia Mono, monospace" font-size="23" fill="rgba(255,255,255,0.86)">$ styky add &quot;Deploy api fri 5pm #infra !!&quot;</text>
+  <text x="80" y="450" font-family="${font}" font-size="24" fill="rgba(255,255,255,0.72)">A free, open-source Windows reminder widget.</text>
 
   <g transform="translate(80 500)">
     <rect width="258" height="60" rx="30" fill="#7d63ff"/>

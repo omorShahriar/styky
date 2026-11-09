@@ -9,7 +9,6 @@ import {
   Plus,
   Repeat,
   Rocket,
-  Sparkles,
   Zap,
 } from "lucide-react";
 import { config } from "../config";
@@ -18,32 +17,33 @@ import { Reveal, SectionHead } from "./util";
 export function Problem() {
   const steps = [
     {
-      icon: AppWindow,
-      title: "Always in sight",
-      text: "One frosted-glass panel sits on the desktop layer, behind your windows. You see it every time you glance at your desktop, even after Win+D.",
-    },
-    {
       icon: Zap,
-      title: "Captured in two seconds",
-      text: "Press Ctrl+Alt+N anywhere, type a sentence, hit Enter. No forms, no pickers, no project to file it under.",
+      title: "Set it from anywhere",
+      text: "Ctrl+Alt+N from any app, styky add from a terminal or a git hook, or ask Claude. One grammar for all of them: Deploy api fri 5pm #infra !!",
     },
     {
       icon: BellRing,
-      title: "Nudges, not nagging",
-      text: "A native Windows notification fires on time, with Snooze and Done right on it. Missed ones are summarized in one toast, not a flood.",
+      title: "Keeps nagging until it is done",
+      text: "Native Windows toasts with Done and Snooze. With Pro, a Critical reminder (!!!) re-notifies every 10 minutes by default until you complete or snooze it.",
+    },
+    {
+      icon: Lock,
+      title: "Local, with no account",
+      text: "A SQLite file on your PC and a named pipe only your Windows user can open. MIT licensed, so you can read every line.",
     },
   ];
   return (
     <section className="x-section" id="why">
       <div className="x-wrap x-split">
         <Reveal>
-          <p className="x-eyebrow">The problem</p>
+          <p className="x-eyebrow">Why Styky</p>
           <p className="x-quote">
-            Task managers are built for projects. The most dangerous tasks are the small, single ones that live
-            only in your head <s>until it&rsquo;s too late.</s>
+            Deploy on Friday. Rotate the keys. Check CI after the push. Small, single things that live only in your
+            head <s>until it&rsquo;s too late.</s>
           </p>
           <p className="x-lead" style={{ fontSize: 16 }}>
-            Release on Friday. Rotate the keys. Reply before 5. Not a project, just something you can&rsquo;t drop.
+            Not a project, not a ticket. Styky is where your tools and your assistant can put them, and where you can
+            see them.
           </p>
         </Reveal>
         <div className="x-steps">
@@ -66,27 +66,26 @@ export function Problem() {
   );
 }
 
-const FEATURES = [
-  { icon: AppWindow, title: "A real desktop widget", text: "A resizable Acrylic glass panel that follows light and dark mode and your Windows accent color, and remembers its size and position." },
-  { icon: Plus, title: "Global quick add", text: "A Spotlight-style bar with natural-language dates, #tags, !! priority, repeats and links. One shortcut, from any app." },
+const FEATURES: { icon: typeof Zap; title: string; text: string; pro?: boolean }[] = [
+  { icon: Plus, title: "Global quick add", text: "A Spotlight-style bar with natural-language dates, #tags, @branch, !! priority, repeats and links. One shortcut, from any app." },
   { icon: BellRing, title: "Native notifications", text: "Windows toasts with a Snooze dropdown (10 min, 1 hour, this evening, tomorrow, custom) and Done." },
-  { icon: FileText, title: "Markdown details", text: "Notes, code, links and checklists you can tick, right in the widget. Click a reminder and it expands in place." },
-  { icon: Repeat, title: "Repeats that behave", text: "Daily, weekdays, weekly, monthly. The 31st stays the 31st and clamps to shorter months." },
-  { icon: Code2, title: "Developer-friendly", text: "A branch chip (@release/2.3) that copies on click, a link field, and project tags." },
+  { icon: Zap, title: "Critical and pre-alerts", text: "Critical re-notifies every N minutes until you act. Pre-alerts warn 5 minutes to 1 day ahead.", pro: true },
+  { icon: Code2, title: "Built for developers", text: "A branch chip (@release/2.3) that copies on click, a link field, project tags, and a CLI and MCP server." },
+  { icon: Repeat, title: "Repeats that behave", text: "Daily, weekdays, weekly, monthly, with the 31st clamped to shorter months. Pro adds every 2 weeks, Mon/Wed/Fri, the last Friday of the month, end after N times." },
+  { icon: FileText, title: "Markdown details", text: "Notes, code, links and checklists you can tick, right in the widget." },
+  { icon: AppWindow, title: "A desktop panel", text: "A resizable Acrylic glass panel on the desktop layer that follows light and dark mode and your accent color. Pro adds tint, density and a paper skin." },
   { icon: Keyboard, title: "Keyboard-first", text: "Navigate, complete, snooze, edit and delete without touching the mouse." },
-  { icon: Sparkles, title: "Feels native", text: "Spring animations that can be interrupted, reduced-motion support, and light and dark themes." },
-  { icon: Lock, title: "Private by design", text: "Everything stays on your PC. JSON export and import for backups." },
-  { icon: Rocket, title: "Starts with Windows", text: "Launches at login by default and updates itself from signed GitHub releases, with one click." },
+  { icon: Rocket, title: "Starts with Windows", text: "Launches at login by default and updates itself from signed GitHub releases. Everything stays on your PC, with JSON export and import." },
 ];
 
 export function Features() {
   return (
-    <section className="x-section alt" id="features">
+    <section className="x-section" id="features">
       <div className="x-wrap">
         <SectionHead
           eyebrow="Features"
           title="Small on screen. Complete underneath."
-          lead="Everything you see below is free, open source and always will be."
+          lead="Free and open source, except the items marked Pro."
           center
         />
         <div className="x-grid c3">
@@ -96,7 +95,9 @@ export function Features() {
                 <div className="x-ico">
                   <f.icon size={20} strokeWidth={1.75} />
                 </div>
-                <h3>{f.title}</h3>
+                <h3>
+                  {f.title} {f.pro ? <span className="x-badge">Pro</span> : null}
+                </h3>
                 <p>{f.text}</p>
               </div>
             </Reveal>
@@ -121,7 +122,7 @@ const KEYS: { keys: string[]; label: string }[] = [
 
 export function KeyboardSection() {
   return (
-    <section className="x-section" id="keyboard">
+    <section className="x-section alt" id="keyboard">
       <div className="x-wrap">
         <SectionHead
           eyebrow="Keyboard-first"
@@ -161,10 +162,12 @@ export function Privacy() {
     ["No account, no cloud.", "There is no sign-up and no server to sync to."],
     ["No telemetry.", "No analytics, ads or crash reporting. Styky never learns how you use it."],
     ["Your data is a file.", "Reminders live in a local SQLite database. Export or import JSON any time."],
+    ["A private local API.", "The CLI and MCP server use a named pipe restricted to your Windows account. Nothing listens on the network."],
+    ["Your assistant, your call.", "If you connect Claude or another client, what it reads from Styky goes to that assistant."],
     ["Open source.", "Read every line on GitHub, or build it yourself."],
   ];
   return (
-    <section className="x-section alt" id="privacy">
+    <section className="x-section" id="privacy">
       <div className="x-wrap x-priv">
         <div>
           <Reveal>
@@ -238,11 +241,31 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     ),
   },
   {
-    q: "What if Pro doesn't ship, or I'm not happy?",
+    q: "What works without Pro?",
     a: (
       <p>
-        If Pro v1 doesn&rsquo;t ship, you get a full refund, no questions asked. Request it from your purchase
-        receipt or open an issue on <a href={config.issuesUrl}>GitHub</a>.
+        Everything in the panel, plus <code>styky add</code>, <code>styky ls</code> and the MCP tools{" "}
+        <code>styky_add</code> and <code>styky_list</code>. Pro adds <code>get</code>, <code>done</code>,{" "}
+        <code>snooze</code>, <code>edit</code> and <code>rm</code> (and the matching MCP tools), Critical reminders,
+        pre-alerts, themes and advanced repeats.
+      </p>
+    ),
+  },
+  {
+    q: "Does the Styky app have to be running for the CLI?",
+    a: (
+      <p>
+        Yes. <code>styky</code> talks to the running app, so with Styky closed you get &ldquo;Styky isn&rsquo;t
+        running&rdquo; and exit code 2. Styky starts with Windows by default.
+      </p>
+    ),
+  },
+  {
+    q: "Does it work with ChatGPT?",
+    a: (
+      <p>
+        Not directly. ChatGPT only connects to remote HTTPS MCP servers, and <code>styky mcp</code> is a local one.
+        Claude Desktop, Claude Code and other clients that launch a local command work today.
       </p>
     ),
   },
@@ -265,7 +288,12 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Is there a Microsoft Store version?",
-    a: <p>Not yet. For now the installer on GitHub Releases is the way to get Styky.</p>,
+    a: (
+      <p>
+        A Store listing is in review. The CLI and MCP server ship with the installer on GitHub Releases; the Store
+        build does not include them yet.
+      </p>
+    ),
   },
 ];
 
