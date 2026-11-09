@@ -206,7 +206,7 @@ Deviations / decisions:
 
 - **Packaging**: `scripts/build-msix.ps1` (`pnpm tauri build --no-bundle`, stage `styky.exe` + generated tile assets + `resources.pri`, `makeappx pack`,
   optional throwaway self-signed signature). Template: `packaging/msix/AppxManifest.xml` (`runFullTrust`, `windows.startupTask` id `StykyStartup`,
-  Enabled by default). Identity Name / Publisher / PublisherDisplayName are script parameters (placeholders `Styky.LocalTest` / `CN=StykyLocalTest`).
+  Enabled by default). Identity Name and Publisher are the real Partner Center values in the template (`-Store` uses them as is; a local-test build swaps in `Styky.LocalTest` / `CN=StykyLocalTest`). PublisherDisplayName is a script parameter, default `omor.dev`.
   Output in `dist-msix/` (git-ignored, with `*.msix/*.pfx/*.cer`). The pfx is deleted right after signing and the key is removed from the cert store.
 - **Detection**: `store.rs` `is_packaged()` (`GetCurrentPackageFullName` != APPMODEL_ERROR_NO_PACKAGE). Cargo feature `store` only forces `is_store()`
   (UI: hides updater) for unpackaged testing; identity-dependent code uses `is_packaged()`.

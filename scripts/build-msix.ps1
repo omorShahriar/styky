@@ -4,17 +4,20 @@
 
 .DESCRIPTION
   Tauri has no MSIX bundler, so this stages styky.exe + tile assets + AppxManifest.xml and packs them with makeappx.
-  Identity values come from Partner Center (see docs/RELEASING.md). Defaults are local-test placeholders.
+  The real Partner Center identity (Name omor.dev.Styky and its Publisher CN) lives in packaging\msix\AppxManifest.xml.
+  A -Store build uses it as it is; a local-test build replaces it with a test identity so it never collides with the Store app.
+  PublisherDisplayName is a parameter (default "omor.dev"); it has to match the Partner Center account's publisher display
+  name at upload time, so pass -PublisherDisplayName "..." once the account name changes.
 
-  Store upload: .\scripts\build-msix.ps1 -Store               (real Partner Center identity, unsigned)
-  Local test:   .\scripts\build-msix.ps1                      (self-signed, writes a .cer to trust)
+  Store upload: .\scripts\build-msix.ps1 -Store               (real identity, unsigned)
+  Local test:   .\scripts\build-msix.ps1                      (test identity, self-signed, writes a .cer to trust)
   The Store signs the upload itself, so a Store submission needs no certificate.
 #>
 param(
-  [switch]$Store,                   # use the Partner Center identity below and skip signing
-  [string]$IdentityName = "Styky.LocalTest",
-  [string]$Publisher = "CN=StykyLocalTest",
-  [string]$PublisherDisplayName = "Styky Local Test",
+  [switch]$Store,                   # use the manifest template's real identity and skip signing
+  [string]$IdentityName = "Styky.LocalTest",   # local-test builds only
+  [string]$Publisher = "CN=StykyLocalTest",    # local-test builds only (also the throwaway certificate's subject)
+  [string]$PublisherDisplayName = "omor.dev",
   [string]$Version,                 # default: tauri.conf.json version + ".0"
   [switch]$Unsigned,                # skip signing (Store upload)
   [switch]$SkipBuild,               # reuse src-tauri\target\release\styky.exe
@@ -22,11 +25,10 @@ param(
 )
 $ErrorActionPreference = "Stop"
 
-# Partner Center → Product management → Product identity (Store ID 9NZ2ZDFQJLB5). Public values, safe to commit.
 if ($Store) {
-  $IdentityName = "omor.dev.Styky"
-  $Publisher = "CN=150ED2D0-F7B0-4A9D-B63F-68D0C7FDD60C"
-  $PublisherDisplayName = "omor.dev"
+  if ($PSBoundParameters.ContainsKey("IdentityName") -or $PSBoundParameters.ContainsKey("Publisher")) {
+    throw "-Store uses the identity in packaging\msix\AppxManifest.xml; -IdentityName and -Publisher are for local-test builds"
+  }
   $Unsigned = $true
 }
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
@@ -100,8 +102,15 @@ foreach ($t in 16, 24, 32, 48, 256) {
 $src.Dispose()
 
 $manifest = Get-Content -Raw "packaging\msix\AppxManifest.xml"
-$manifest = $manifest.Replace("{{IDENTITY_NAME}}", $IdentityName).Replace("{{PUBLISHER}}", $Publisher).
-  Replace("{{PUBLISHER_DISPLAY_NAME}}", [Security.SecurityElement]::Escape($PublisherDisplayName)).Replace("{{VERSION}}", $Version)
+if (-not $Store) {
+  # Local test: a different identity, so the test package never replaces (or is replaced by) the Store app.
+  $manifest = [regex]::Replace($manifest, '(<Identity\s+Name=")[^"]*(" Publisher=")[^"]*(")', {
+    param($m) $m.Groups[1].Value + $IdentityName + $m.Groups[2].Value + $Publisher + $m.Groups[3].Value
+  })
+}
+$manifest = $manifest.Replace("{{PUBLISHER_DISPLAY_NAME}}", [Security.SecurityElement]::Escape($PublisherDisplayName)).Replace("{{VERSION}}", $Version)
+if ($manifest -match '\{\{') { throw "AppxManifest.xml still has an unreplaced {{token}}" }
+Write-Host ("Identity: " + ([regex]::Match($manifest, '<Identity [^>]*>').Value))
 [IO.File]::WriteAllText((Join-Path $stage "AppxManifest.xml"), $manifest, (New-Object Text.UTF8Encoding $false))
 
 # resources.pri so Windows can pick the right scale/targetsize of each tile asset

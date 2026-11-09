@@ -62,7 +62,9 @@ code-signing certificate is involved. The NSIS/GitHub build above is unchanged. 
 
 ### Package identity
 
-Public package metadata (Partner Center → Product management → Product identity), baked into `build-msix.ps1 -Store`:
+Public package metadata (Partner Center → Product management → Product identity). Name and Publisher are written into the manifest
+template `packaging/msix/AppxManifest.xml`; `build-msix.ps1 -Store` uses them as they are, and a local-test build swaps in a test
+identity:
 
 | Field | Value |
 |---|---|
@@ -78,7 +80,8 @@ Windows uses the PFN for the installed app. Toasts show under the AUMID `omor.de
 the NSIS install's database; Settings → Export / Import moves reminders between the two.
 
 A Partner Center upload is checked against the account's current publisher display name, so build with the
-`-PublisherDisplayName` the account has at that moment.
+`-PublisherDisplayName` the account has at that moment (default `omor.dev`):
+`.\scripts\build-msix.ps1 -Store -PublisherDisplayName "<name>"`.
 
 ### Build
 
@@ -89,7 +92,7 @@ through `winget` if `makeappx.exe` is missing.
 .\scripts\build-msix.ps1 -Store
 ```
 
-`-Store` uses the identity above and builds **unsigned**, which is what Partner Center expects (the Store signs after
+`-Store` uses the identity above (and refuses `-IdentityName` / `-Publisher`) and builds **unsigned**, which is what Partner Center expects (the Store signs after
 certification). Add `-SkipBuild` to reuse an existing `src-tauri\target\release\styky.exe`, but only if no `.rs`/`.ts` file changed since
 that build.
 

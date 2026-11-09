@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Template. scripts/build-msix.ps1 replaces the {{TOKENS}}.
-  Identity Name / Publisher / PublisherDisplayName come from Partner Center
-  (Product identity page); see docs/RELEASING.md.
+  Template. scripts/build-msix.ps1 fills in the double-brace tokens.
+  Identity Name and Publisher are the real Partner Center values (Product identity page, Store ID 9NZ2ZDFQJLB5).
+  They are public package metadata. A -Store build uses them as they are; a local-test build swaps in a test identity.
+  PublisherDisplayName is a build parameter (default "omor.dev"): it has to equal the Partner Center account's
+  publisher display name when the package is uploaded. See docs/RELEASING.md.
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -11,7 +13,7 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap5 rescap">
 
-  <Identity Name="{{IDENTITY_NAME}}" Publisher="{{PUBLISHER}}" Version="{{VERSION}}" ProcessorArchitecture="x64" />
+  <Identity Name="omor.dev.Styky" Publisher="CN=150ED2D0-F7B0-4A9D-B63F-68D0C7FDD60C" Version="{{VERSION}}" ProcessorArchitecture="x64" />
 
   <Properties>
     <DisplayName>Styky</DisplayName>
