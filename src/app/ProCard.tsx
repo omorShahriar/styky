@@ -1,16 +1,16 @@
 import { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "../lib/api";
-import { useLicense } from "../lib/pro";
+import { PRO_URL, useLicense } from "../lib/pro";
 
 const BENEFITS = [
-  "Local API, the styky CLI and AI connectors (Claude, ChatGPT, any MCP client)",
-  "Pre-alerts and Critical reminders that keep nagging until you act",
-  "Themes: tint, transparency, density, accent, a sticky-note skin",
   "Advanced repeats: every 2 weeks, Mon/Wed/Fri, last Friday of the month, end after N",
+  "Nagging: switch it on for a reminder and it notifies again until you act",
+  "Early alerts: a heads-up before the due time",
+  "Themes: tint, transparency, density, accent, a sticky-note skin",
 ];
 
-/** Settings → Styky Pro: benefits, buy link, key entry, activated state. Honor system: the free tier stays complete. */
+/** Settings → Styky Pro: benefits, a link to the Pro page, key entry, activated state. Honor system: the free tier stays complete. */
 export function ProCard() {
   const lic = useLicense();
   const [key, setKey] = useState("");
@@ -19,7 +19,7 @@ export function ProCard() {
   const [note, setNote] = useState<string | null>(null);
 
   if (!lic) return null;
-  const owned = lic.state === "active" || lic.state === "grace-expired" || lic.state === "dev";
+  const owned = lic.state === "active" || lic.state === "dev";
 
   const activate = async () => {
     setBusy(true);
@@ -39,7 +39,7 @@ export function ProCard() {
     setNote(null);
     try {
       const freed = await api.licenseRemove();
-      setNote(freed ? "License removed. The activation slot was freed." : "License removed from this PC. You were offline, so the slot is still used; free it from your Lemon Squeezy receipt page.");
+      setNote(freed ? "License removed. The activation slot was freed." : "License removed from this PC. You were offline, so the activation slot is still used; free it from your receipt page.");
     } catch (e) {
       setError(String(e));
     } finally {
@@ -65,11 +65,6 @@ export function ProCard() {
                     : "Thank you for supporting Styky!"}
               </span>
             </div>
-            {lic.state === "grace-expired" && (
-              <p className="inline-error" role="status">
-                Pro is paused: Styky hasn't been able to verify your license for over 30 days. Connect to the internet and it comes back on its own.
-              </p>
-            )}
             {lic.keyHint && <p className="muted small">License {lic.keyHint}</p>}
             {lic.state !== "dev" && (
               <div className="pro-actions">
@@ -90,8 +85,8 @@ export function ProCard() {
               ))}
             </ul>
             <div className="pro-actions">
-              <button className="btn primary" onClick={() => void openUrl(lic.buyUrl)}>
-                Buy Styky Pro
+              <button className="btn" onClick={() => void openUrl(PRO_URL).catch(() => {})}>
+                Get Pro
               </button>
             </div>
             <form
@@ -114,6 +109,7 @@ export function ProCard() {
                 {busy ? "Checking…" : "Activate"}
               </button>
             </form>
+            <p className="muted small">Styky checks the key once, online, when you click Activate. Offline, it accepts the key as entered.</p>
           </div>
         )}
         {error && (

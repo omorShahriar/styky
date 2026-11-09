@@ -144,10 +144,11 @@ fn pro_changed(app: &AppHandle, before: bool) {
 
 #[tauri::command]
 pub fn license_status(db: State<Db>) -> crate::license::Status {
-    crate::license::status(&db, now_ms())
+    crate::license::status(&db)
 }
 
-/// Activate a key (network: runs off the main thread).
+/// Activate a key. The one request to the licence server (started by the user's click); runs off the main thread.
+/// Offline or a failed request still accepts a well-formed key (see `license::activate`).
 #[tauri::command]
 pub async fn license_activate(app: AppHandle, key: String) -> Res<crate::license::Status> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -155,22 +156,23 @@ pub async fn license_activate(app: AppHandle, key: String) -> Res<crate::license
         let before = crate::license::is_pro();
         let now = now_ms();
         crate::license::activate(&db, &crate::license::UreqHttp, &key, &crate::license::instance_name(&db), now)?;
-        crate::license::refresh(&db, now);
+        crate::license::refresh(&db);
         pro_changed(&app, before);
-        Ok(crate::license::status(&db, now))
+        Ok(crate::license::status(&db))
     })
     .await
     .map_err(|e| e.to_string())?
 }
 
-/// "Remove license": free the activation slot, forget the key. Returns whether the slot was freed online.
+/// "Remove license": free the activation slot (the one request, started by the user's click) and forget the key.
+/// Returns whether the slot was freed.
 #[tauri::command]
 pub async fn license_remove(app: AppHandle) -> Res<bool> {
     tauri::async_runtime::spawn_blocking(move || {
         let db = app.state::<Db>();
         let before = crate::license::is_pro();
         let freed = crate::license::deactivate(&db, &crate::license::UreqHttp)?;
-        crate::license::refresh(&db, now_ms());
+        crate::license::refresh(&db);
         pro_changed(&app, before);
         Ok(freed)
     })

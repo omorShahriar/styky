@@ -117,7 +117,7 @@ pub fn run() {
             quickadd::setup(&handle);
             quickadd::init(&handle);
             scheduler::spawn(handle.clone());
-            spawn_license_check(handle.clone());
+            load_license(&handle);
             app.manage(std::sync::Arc::new(api::ApiStatus::default()));
             spawn_api(handle.clone());
             Ok(())
@@ -195,15 +195,10 @@ fn spawn_api(app: tauri::AppHandle) {
     let _ = app;
 }
 
-/// Load the cached entitlement, then re-check it (if due) at start and every 6 hours.
-fn spawn_license_check(app: tauri::AppHandle) {
-    license::refresh(&app.state::<db::Db>(), commands::now_ms());
-    std::thread::spawn(move || {
-        loop {
-            license::background_check(&app);
-            std::thread::sleep(Duration::from_secs(6 * 3600));
-        }
-    });
+/// Read the stored licence key from the local database. No network: the key is only ever checked when the user
+/// clicks Activate (and the slot freed when they click Remove).
+fn load_license(app: &tauri::AppHandle) {
+    license::refresh(&app.state::<db::Db>());
 }
 
 /// Release builds turn "launch at login" on once, the first time they run; after that the user's choice wins.

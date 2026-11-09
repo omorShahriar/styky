@@ -7,12 +7,10 @@ export const PRO_URL = "https://styky.smallhingelabs.com/pro";
 
 export interface LicenseStatus {
   pro: boolean;
-  /** none | active | grace-expired | dev */
-  state: "none" | "active" | "grace-expired" | "dev";
+  /** none | active | dev */
+  state: "none" | "active" | "dev";
   keyHint: string | null;
   customer: string | null;
-  validatedAt: number | null;
-  buyUrl: string;
 }
 
 /** Live Pro entitlement (re-read on every `pro-changed`). `null` until the first answer. */

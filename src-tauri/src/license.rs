@@ -1,12 +1,18 @@
-//! Styky Pro licensing against the Lemon Squeezy License API (public endpoints, no secret key).
+//! Styky Pro licensing. Honor-based: the code is public and there is no DRM, tamper check or phone-home.
 //!
-//! * `activate` binds a key to this PC (`instance_name` = "Styky" + a random per-install id, never the PC name); the entitlement
-//!   (key, instance id, last successful validation) is cached in the `license` table.
-//! * Pro is on while the last successful validation is at most [`GRACE_MS`] (30 days) old.
-//! * [`revalidate_due`] re-checks after [`REVALIDATE_MS`] (7 days). **Only an explicit rejection**
-//!   (`invalid` / `disabled` / `expired` / unknown key / unknown instance) removes the entitlement;
-//!   network errors, timeouts and 5xx keep it, so Pro never breaks offline.
-//! * The HTTP layer is the [`Http`] trait so the state machine is unit-tested with a mock.
+//! The only network calls this module can make are the two the user starts by clicking a button:
+//!
+//! * **Activate**: one request to the Lemon Squeezy License API (public endpoints, no secret key) binds the key to this PC
+//!   (`instance_name` = "Styky" + a random per-install id, never the PC name). An explicit "no" (unknown key, activation
+//!   limit, wrong product) is shown to the user. If the request cannot complete (offline, timeout, 5xx, an unreadable
+//!   answer), a well-formed key is accepted anyway.
+//! * **Remove license** (deactivate): one request frees the activation slot; the key is forgotten locally either way.
+//!
+//! Nothing runs at startup, on a timer or in the background: a cached key unlocks Pro for good, refunds do not revoke
+//! it, and the key is never checked again. The provider is an implementation detail (`API`, [`Http`], [`call`]); the
+//! rest of the module only knows "a well-formed key was entered".
+//!
+//! The HTTP layer is the [`Http`] trait so the state machine is unit-tested with a mock.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -16,16 +22,12 @@ use crate::db::{Db, Res};
 
 // ---- configuration (owner: fill these in from the Lemon Squeezy dashboard) ------------------
 
-/// Checkout page opened by the "Buy" button.
-pub const STYKY_BUY_URL: &str = "https://smallhingelabs.lemonsqueezy.com/buy/REPLACE-WITH-CHECKOUT-ID";
 /// Lemon Squeezy store id and product id a key must belong to. `0` = not configured yet: the
 /// check is skipped (anything Lemon issued is accepted). Set both before selling keys.
 pub const LEMON_STORE_ID: u64 = 0;
 pub const LEMON_PRODUCT_ID: u64 = 0;
 
 const API: &str = "https://api.lemonsqueezy.com/v1/licenses";
-pub const REVALIDATE_MS: i64 = 7 * 86_400_000;
-pub const GRACE_MS: i64 = 30 * 86_400_000;
 
 static PRO: AtomicBool = AtomicBool::new(false);
 
@@ -44,42 +46,45 @@ pub fn is_pro() -> bool {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Entitlement {
     pub key: String,
+    /// The provider's activation id, or empty when the key was accepted offline (nothing to release later).
     pub instance_id: String,
+    /// When the key was accepted (the column keeps its original name).
     pub validated_at: i64,
     pub customer: Option<String>,
 }
 
-/// Pure: does this entitlement unlock Pro at `now`?
-pub fn entitles(e: Option<&Entitlement>, now: i64) -> bool {
-    e.is_some_and(|e| now - e.validated_at <= GRACE_MS)
+/// Pure: does this entitlement unlock Pro? Any stored key does, for good.
+pub fn entitles(e: Option<&Entitlement>) -> bool {
+    e.is_some()
 }
 
-/// Pure: is a background re-check due?
-pub fn needs_revalidate(e: &Entitlement, now: i64) -> bool {
-    now - e.validated_at >= REVALIDATE_MS || e.validated_at > now
+/// Is `key` shaped like a license key? 16 to 100 characters, letters, digits, `-` and `_`, at least 16 of them letters
+/// or digits (a Lemon Squeezy key is a 36-character UUID). Deliberately provider-agnostic: this is a typo check, not
+/// proof of purchase.
+pub fn is_well_formed(key: &str) -> bool {
+    let k = key.trim();
+    (16..=100).contains(&k.len())
+        && k.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+        && k.chars().filter(char::is_ascii_alphanumeric).count() >= 16
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
     pub pro: bool,
-    /// `none` | `active` | `grace-expired` (cached but not validated for 30+ days) | `dev`.
+    /// `none` | `active` | `dev`.
     pub state: &'static str,
     pub key_hint: Option<String>,
     pub customer: Option<String>,
-    pub validated_at: Option<i64>,
-    pub buy_url: &'static str,
 }
 
-pub fn status(db: &Db, now: i64) -> Status {
+pub fn status(db: &Db) -> Status {
     let ent = db.license_get().ok().flatten();
-    let entitled = entitles(ent.as_ref(), now);
+    let entitled = entitles(ent.as_ref());
     let state = if dev_forced() {
         "dev"
     } else if entitled {
         "active"
-    } else if ent.is_some() {
-        "grace-expired"
     } else {
         "none"
     };
@@ -88,21 +93,19 @@ pub fn status(db: &Db, now: i64) -> Status {
         state,
         key_hint: ent.as_ref().map(|e| hint(&e.key)),
         customer: ent.as_ref().and_then(|e| e.customer.clone()),
-        validated_at: ent.as_ref().map(|e| e.validated_at),
-        buy_url: STYKY_BUY_URL,
     }
 }
 
-/// `XXXX-…-1234`: never show the whole key again.
+/// `…1234`: never show the whole key again.
 fn hint(key: &str) -> String {
     let tail: String = key.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
     format!("…{tail}")
 }
 
-/// Recompute the in-memory flag from the DB; returns true when it changed.
-pub fn refresh(db: &Db, now: i64) -> bool {
+/// Recompute the in-memory flag from the local database (no network); returns true when it changed.
+pub fn refresh(db: &Db) -> bool {
     let ent = db.license_get().ok().flatten();
-    let new = entitles(ent.as_ref(), now);
+    let new = entitles(ent.as_ref());
     PRO.swap(new, Ordering::SeqCst) != new
 }
 
@@ -143,7 +146,6 @@ impl Http for UreqHttp {
 #[derive(Deserialize, Default)]
 struct ApiResp {
     activated: Option<bool>,
-    valid: Option<bool>,
     deactivated: Option<bool>,
     error: Option<String>,
     license_key: Option<ApiKey>,
@@ -172,7 +174,7 @@ enum Outcome {
     /// An explicit "no" from Lemon Squeezy (message for the UI).
     Rejected(String),
     WrongProduct { instance_id: Option<String> },
-    /// Could not get a trustworthy answer (offline, 5xx, rate limit, garbage). Never removes Pro.
+    /// Could not get a trustworthy answer (offline, 5xx, rate limit, garbage).
     Unavailable(String),
 }
 
@@ -192,14 +194,12 @@ fn product_matches(meta: &Option<ApiMeta>, store: u64, product: u64) -> bool {
 #[derive(Clone, Copy, PartialEq)]
 enum Call {
     Activate,
-    Validate,
     Deactivate,
 }
 
 fn call(http: &dyn Http, what: Call, form: &[(&str, &str)]) -> Outcome {
     let path = match what {
         Call::Activate => "activate",
-        Call::Validate => "validate",
         Call::Deactivate => "deactivate",
     };
     let resp = match http.post_form(&format!("{API}/{path}"), form) {
@@ -207,7 +207,7 @@ fn call(http: &dyn Http, what: Call, form: &[(&str, &str)]) -> Outcome {
         Err(e) => return Outcome::Unavailable(e),
     };
     // Lemon Squeezy answers a verdict with 200 / 400 / 404 / 422. Anything else (401/403 from a proxy, captive
-    // portal, WAF, 5xx, 429, ...) says nothing about the key and must never take Pro away.
+    // portal, WAF, 5xx, 429, ...) says nothing about the key.
     if !matches!(resp.status, 200 | 400 | 404 | 422) {
         return Outcome::Unavailable(format!("license server returned {}", resp.status));
     }
@@ -218,7 +218,6 @@ fn call(http: &dyn Http, what: Call, form: &[(&str, &str)]) -> Outcome {
     let customer = body.meta.as_ref().and_then(|m| m.customer_name.clone());
     let verdict = match what {
         Call::Activate => body.activated,
-        Call::Validate => body.valid,
         Call::Deactivate => body.deactivated,
     };
     let dead_status = matches!(key_status, "expired" | "disabled" | "invalid");
@@ -226,8 +225,7 @@ fn call(http: &dyn Http, what: Call, form: &[(&str, &str)]) -> Outcome {
     if verdict.is_none() && !dead_status {
         return Outcome::Unavailable(format!("no verdict in the response ({})", resp.status));
     }
-    let ok = verdict == Some(true) && !(what == Call::Validate && dead_status);
-    if ok {
+    if verdict == Some(true) {
         if what != Call::Deactivate && !product_ok(&body.meta) {
             return Outcome::WrongProduct { instance_id: body.instance.map(|i| i.id) };
         }
@@ -247,19 +245,24 @@ pub fn instance_name(db: &Db) -> String {
     format!("Styky {}", db.install_id())
 }
 
-/// Activate `key` on this PC and cache the entitlement. A previous activation (another key, or the same key
-/// activated again) is released afterwards, best effort, so slots do not leak.
+/// Activate `key` on this PC and store it. One request, started by the user's click. A key that is not well-formed is
+/// refused without any request; an explicit rejection from the provider is returned as the error; if the request
+/// cannot complete, the key is accepted as entered (offline activation) and never checked again. A previous
+/// activation (another key) is released afterwards, best effort, so slots do not leak.
 pub fn activate(db: &Db, http: &dyn Http, key: &str, name: &str, now: i64) -> Res<Entitlement> {
     let key = key.trim();
     if key.is_empty() {
         return Err("Enter your license key.".into());
+    }
+    if !is_well_formed(key) {
+        return Err("That does not look like a license key. Copy it from your receipt.".into());
     }
     match call(http, Call::Activate, &[("license_key", key), ("instance_name", name)]) {
         Outcome::Ok { instance_id: Some(instance_id), customer } => {
             let old = db.license_get()?;
             let ent = Entitlement { key: key.to_string(), instance_id, validated_at: now, customer };
             db.license_set(&ent)?;
-            if let Some(old) = old.filter(|o| o.instance_id != ent.instance_id) {
+            if let Some(old) = old.filter(|o| !o.instance_id.is_empty() && o.instance_id != ent.instance_id) {
                 release(http, &old.key, &old.instance_id);
             }
             Ok(ent)
@@ -273,7 +276,12 @@ pub fn activate(db: &Db, http: &dyn Http, key: &str, name: &str, now: i64) -> Re
             }
             Err("This key is for a different product.".into())
         }
-        Outcome::Unavailable(e) => Err(format!("Could not reach the license server ({e}). Check your connection and try again.")),
+        Outcome::Unavailable(_) => {
+            // Offline or the server is unwell: honor system. Accept the well-formed key; there is no activation to release.
+            let ent = Entitlement { key: key.to_string(), instance_id: String::new(), validated_at: now, customer: None };
+            db.license_set(&ent)?;
+            Ok(ent)
+        }
     }
 }
 
@@ -282,62 +290,18 @@ fn release(http: &dyn Http, key: &str, instance_id: &str) {
     let _ = call(http, Call::Deactivate, &[("license_key", key), ("instance_id", instance_id)]);
 }
 
-/// Result of a background re-check.
-#[derive(Debug, PartialEq)]
-pub enum Revalidation {
-    /// Nothing cached, or not due yet.
-    Skipped,
-    Renewed,
-    /// Explicitly rejected: the entitlement was removed.
-    Revoked,
-    /// Offline / server trouble: the cached entitlement is untouched.
-    Kept,
-}
-
-/// Re-check the cached entitlement if it is due (or `force`).
-pub fn revalidate(db: &Db, http: &dyn Http, now: i64, force: bool) -> Revalidation {
-    let Ok(Some(ent)) = db.license_get() else { return Revalidation::Skipped };
-    if !force && !needs_revalidate(&ent, now) {
-        return Revalidation::Skipped;
-    }
-    match call(http, Call::Validate, &[("license_key", &ent.key), ("instance_id", &ent.instance_id)]) {
-        Outcome::Ok { customer, .. } => {
-            // Only touch the row we validated: a Remove or a new activation during the request wins.
-            let customer = customer.or_else(|| ent.customer.clone());
-            let _ = db.license_renew(&ent.key, &ent.instance_id, now, customer.as_deref());
-            Revalidation::Renewed
-        }
-        Outcome::Rejected(_) | Outcome::WrongProduct { .. } => {
-            let _ = db.license_clear_if(&ent.key, &ent.instance_id);
-            Revalidation::Revoked
-        }
-        Outcome::Unavailable(_) => Revalidation::Kept,
-    }
-}
-
-/// "Remove license": free the activation slot (best effort) and forget the key locally.
-/// Offline removal still succeeds locally; the slot can be freed from the Lemon Squeezy customer portal.
+/// "Remove license": free the activation slot (one request, best effort) and forget the key locally. A key that was
+/// accepted offline has no activation, so nothing is sent. Offline removal still succeeds locally; the slot can be
+/// freed from the customer portal. Returns whether the slot is free.
 pub fn deactivate(db: &Db, http: &dyn Http) -> Res<bool> {
     let Some(ent) = db.license_get()? else { return Ok(true) };
-    let freed = matches!(
-        call(http, Call::Deactivate, &[("license_key", &ent.key), ("instance_id", &ent.instance_id)]),
-        Outcome::Ok { .. }
-    );
+    let freed = ent.instance_id.is_empty()
+        || matches!(
+            call(http, Call::Deactivate, &[("license_key", &ent.key), ("instance_id", &ent.instance_id)]),
+            Outcome::Ok { .. }
+        );
     db.license_clear_if(&ent.key, &ent.instance_id)?;
     Ok(freed)
-}
-
-/// Startup / periodic check, called from a background thread.
-pub fn background_check(app: &tauri::AppHandle) {
-    use tauri::{Emitter, Manager};
-    let db = app.state::<Db>();
-    let now = crate::commands::now_ms();
-    let before = is_pro();
-    revalidate(&db, &UreqHttp, now, false);
-    refresh(&db, now);
-    if before != is_pro() {
-        let _ = app.emit("pro-changed", is_pro());
-    }
 }
 
 // ---- tests ----------------------------------------------------------------------------------
@@ -358,6 +322,9 @@ mod tests {
         fn new(replies: Vec<Result<HttpResponse, String>>) -> Self {
             Self { replies: RefCell::new(replies), calls: RefCell::new(vec![]) }
         }
+        fn count(&self) -> usize {
+            self.calls.borrow().len()
+        }
     }
     impl Http for Mock {
         fn post_form(&self, url: &str, form: &[(&str, &str)]) -> Result<HttpResponse, String> {
@@ -371,99 +338,156 @@ mod tests {
         Ok(HttpResponse { status, body: body.into() })
     }
     const ACTIVATED: &str = r#"{"activated":true,"error":null,"license_key":{"status":"active"},"instance":{"id":"inst-1","name":"X"},"meta":{"store_id":1,"product_id":2,"customer_name":"Ada"}}"#;
-    const VALID: &str = r#"{"valid":true,"error":null,"license_key":{"status":"active"},"instance":{"id":"inst-1"},"meta":{"store_id":1,"product_id":2,"customer_name":"Ada"}}"#;
-    const DAY: i64 = 86_400_000;
+    const KEY: &str = "0b9d52c1-77a4-4f6e-9a3c-5d1e2f3a1234";
 
     fn activated_db(at: i64) -> Db {
         let db = Db::open_memory().unwrap();
         let http = Mock::new(vec![reply(200, ACTIVATED)]);
-        activate(&db, &http, "KEY-1234", "PC Styky", at).unwrap();
+        activate(&db, &http, KEY, "PC Styky", at).unwrap();
         db
     }
 
     #[test]
-    fn activate_caches_the_entitlement_and_sends_the_instance_name() {
+    fn activate_stores_the_key_and_sends_the_instance_name() {
         let db = Db::open_memory().unwrap();
         let http = Mock::new(vec![reply(200, ACTIVATED)]);
-        let e = activate(&db, &http, "  KEY-1234 ", "DESK Styky", 1000).unwrap();
+        let e = activate(&db, &http, &format!("  {KEY} "), "DESK Styky", 1000).unwrap();
         assert_eq!((e.instance_id.as_str(), e.validated_at, e.customer.as_deref()), ("inst-1", 1000, Some("Ada")));
         assert_eq!(db.license_get().unwrap(), Some(e));
         let calls = http.calls.borrow();
+        assert_eq!(calls.len(), 1);
         assert!(calls[0].0.ends_with("/licenses/activate"));
-        assert!(calls[0].1.contains(&("license_key".into(), "KEY-1234".into())));
+        assert!(calls[0].1.contains(&("license_key".into(), KEY.into())));
         assert!(calls[0].1.contains(&("instance_name".into(), "DESK Styky".into())));
     }
 
     #[test]
-    fn activate_reports_rejections_and_offline_without_caching() {
+    fn an_explicit_rejection_is_shown_and_nothing_is_stored() {
         let db = Db::open_memory().unwrap();
         let bad = Mock::new(vec![reply(404, r#"{"activated":false,"error":"license_key not found."}"#)]);
-        assert_eq!(activate(&db, &bad, "nope", "n", 0).unwrap_err(), "license_key not found.");
+        assert_eq!(activate(&db, &bad, KEY, "n", 0).unwrap_err(), "license_key not found.");
         let limit = Mock::new(vec![reply(400, r#"{"activated":false,"error":"This license key has reached the activation limit."}"#)]);
-        assert!(activate(&db, &limit, "k", "n", 0).unwrap_err().contains("activation limit"));
-        let off = Mock::new(vec![Err("dns error".into())]);
-        assert!(activate(&db, &off, "k", "n", 0).unwrap_err().contains("Could not reach"));
-        let down = Mock::new(vec![reply(503, "<html>")]);
-        assert!(activate(&db, &down, "k", "n", 0).unwrap_err().contains("Could not reach"));
-        assert!(activate(&db, &bad, "  ", "n", 0).is_err());
+        assert!(activate(&db, &limit, KEY, "n", 0).unwrap_err().contains("activation limit"));
+        for body in [
+            r#"{"activated":false,"license_key":{"status":"disabled"}}"#,
+            r#"{"activated":false,"license_key":{"status":"expired"}}"#,
+        ] {
+            assert!(activate(&db, &Mock::new(vec![reply(400, body)]), KEY, "n", 0).is_err(), "{body}");
+        }
         assert_eq!(db.license_get().unwrap(), None);
+        assert!(!is_pro_in(&db));
+    }
+
+    fn is_pro_in(db: &Db) -> bool {
+        status(db).pro
     }
 
     #[test]
-    fn grace_window_is_30_days_from_the_last_validation() {
-        let e = Entitlement { key: "k".into(), instance_id: "i".into(), validated_at: 0, customer: None };
-        assert!(entitles(Some(&e), 29 * DAY));
-        assert!(entitles(Some(&e), 30 * DAY));
-        assert!(!entitles(Some(&e), 30 * DAY + 1));
-        assert!(!entitles(None, 0));
-        assert!(!needs_revalidate(&e, 6 * DAY));
-        assert!(needs_revalidate(&e, 7 * DAY));
-    }
-
-    #[test]
-    fn revalidation_skips_until_due_then_renews() {
-        let db = activated_db(0);
-        let http = Mock::new(vec![reply(200, VALID)]);
-        assert_eq!(revalidate(&db, &http, 3 * DAY, false), Revalidation::Skipped);
-        assert!(http.calls.borrow().is_empty());
-        assert_eq!(revalidate(&db, &http, 8 * DAY, false), Revalidation::Renewed);
-        assert_eq!(db.license_get().unwrap().unwrap().validated_at, 8 * DAY);
-        let c = http.calls.borrow();
-        assert!(c[0].0.ends_with("/licenses/validate"));
-        assert!(c[0].1.contains(&("instance_id".into(), "inst-1".into())));
-    }
-
-    #[test]
-    fn offline_or_server_errors_never_remove_pro() {
-        let db = activated_db(0);
-        for r in [Err("timeout".to_string()), reply(500, "oops"), reply(429, "{}"), reply(200, "not json")] {
-            assert_eq!(revalidate(&db, &Mock::new(vec![r]), 10 * DAY, false), Revalidation::Kept);
-            assert!(db.license_get().unwrap().is_some());
+    fn a_malformed_or_empty_key_is_refused_without_a_request() {
+        let db = Db::open_memory().unwrap();
+        let http = Mock::new(vec![]);
+        for k in ["", "   ", "nope", "KEY-1234", "has spaces in it but is long enough", "ünïcödé-key-0000-1111-2222", &"x".repeat(101), "----------------"] {
+            assert!(activate(&db, &http, k, "n", 0).is_err(), "{k:?}");
         }
-        // Still entitled inside the grace window, even though the re-check keeps failing.
-        let e = db.license_get().unwrap();
-        assert!(entitles(e.as_ref(), 29 * DAY));
-        // Past 30 days offline Pro pauses, but the key is kept and recovers once online.
-        assert!(!entitles(e.as_ref(), 31 * DAY));
-        assert_eq!(revalidate(&db, &Mock::new(vec![reply(200, VALID)]), 31 * DAY, false), Revalidation::Renewed);
-        assert!(entitles(db.license_get().unwrap().as_ref(), 40 * DAY));
+        assert_eq!(http.count(), 0);
+        assert_eq!(db.license_get().unwrap(), None);
+        for k in [KEY, "ABCD-EFGH-IJKL-MNOP", "abcdefghijklmnop", "0123456789ABCDEF_x"] {
+            assert!(is_well_formed(k), "{k}");
+        }
     }
 
     #[test]
-    fn explicit_invalid_disabled_expired_remove_pro() {
-        let cases = [
-            r#"{"valid":false,"error":"license_key not found.","license_key":null}"#,
-            r#"{"valid":false,"license_key":{"status":"disabled"}}"#,
-            r#"{"valid":false,"license_key":{"status":"expired"}}"#,
-            r#"{"valid":true,"license_key":{"status":"expired"}}"#,
-            r#"{"valid":false,"error":"instance not found"}"#,
-        ];
-        for body in cases {
-            let db = activated_db(0);
-            let r = revalidate(&db, &Mock::new(vec![reply(400, body)]), 8 * DAY, false);
-            assert_eq!(r, Revalidation::Revoked, "{body}");
-            assert_eq!(db.license_get().unwrap(), None);
+    fn offline_or_a_failed_request_still_accepts_a_well_formed_key() {
+        for r in [
+            Err("dns error".to_string()),
+            reply(503, "<html>"),
+            reply(500, "oops"),
+            reply(429, "{}"),
+            reply(403, "{}"),
+            reply(200, "not json"),
+            reply(200, "{}"),
+            reply(404, "{}"),
+        ] {
+            let db = Db::open_memory().unwrap();
+            let http = Mock::new(vec![r]);
+            let e = activate(&db, &http, KEY, "n", 77).unwrap();
+            assert_eq!((e.key.as_str(), e.instance_id.as_str(), e.validated_at), (KEY, "", 77));
+            assert_eq!(http.count(), 1, "exactly one attempt, no retry");
+            assert_eq!(db.license_get().unwrap(), Some(e));
+            let s = status(&db);
+            assert_eq!((s.pro, s.state, s.key_hint.as_deref()), (true, "active", Some("…1234")));
         }
+    }
+
+    #[test]
+    fn a_stored_key_unlocks_pro_for_good_and_is_never_checked_again() {
+        let db = activated_db(0);
+        // Any amount of time later, with nothing scripted: no clock input exists, so nothing can expire or be re-checked.
+        assert!(entitles(db.license_get().unwrap().as_ref()));
+        assert!(status(&db).pro);
+        assert!(!entitles(None));
+    }
+
+    #[test]
+    fn the_module_makes_no_request_at_startup_or_on_a_timer_and_one_each_on_activate_and_remove() {
+        let http = Mock::new(vec![reply(200, ACTIVATED), reply(200, r#"{"deactivated":true,"error":null}"#)]);
+        let db = Db::open_memory().unwrap();
+        // "Startup": everything the app runs when it starts, and everything the UI polls, takes no HTTP client at all
+        // (only `activate` and `deactivate` accept one) and so cannot send anything.
+        refresh(&db);
+        status(&db);
+        is_pro();
+        instance_name(&db);
+        assert_eq!(http.count(), 0, "no request before the user clicks");
+        // Activate: exactly one request.
+        activate(&db, &http, KEY, "n", 5).unwrap();
+        assert_eq!(http.count(), 1);
+        assert!(http.calls.borrow()[0].0.ends_with("/licenses/activate"));
+        // Later "ticks" (status polls, refreshes) still send nothing.
+        for _ in 0..3 {
+            refresh(&db);
+            status(&db);
+        }
+        assert_eq!(http.count(), 1);
+        // Remove: exactly one more, a deactivate.
+        assert!(deactivate(&db, &http).unwrap());
+        assert_eq!(http.count(), 2);
+        assert!(http.calls.borrow()[1].0.ends_with("/licenses/deactivate"));
+        assert_eq!(db.license_get().unwrap(), None);
+        // Nothing left to remove: no request.
+        assert!(deactivate(&db, &http).unwrap());
+        assert_eq!(http.count(), 2);
+    }
+
+    #[test]
+    fn only_the_two_click_handlers_may_reach_the_network() {
+        // Guard against a background re-check creeping back in: the real HTTP client is named only where the user's
+        // Activate / Remove clicks are handled.
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut users = vec![];
+        let mut stack = vec![dir];
+        while let Some(d) = stack.pop() {
+            for e in std::fs::read_dir(d).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    stack.push(p);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    let text = std::fs::read_to_string(&p).unwrap();
+                    for (needle, label) in [("UreqHttp", "UreqHttp"), ("license::activate", "activate"), ("license::deactivate", "deactivate")] {
+                        if text.contains(needle) && !p.ends_with("license.rs") {
+                            users.push(format!("{}:{label}", p.file_name().unwrap().to_string_lossy()));
+                        }
+                    }
+                }
+            }
+        }
+        users.sort();
+        users.dedup();
+        assert_eq!(
+            users,
+            ["commands.rs:UreqHttp", "commands.rs:activate", "commands.rs:deactivate"],
+            "UreqHttp / activate / deactivate are used outside the click handlers"
+        );
     }
 
     #[test]
@@ -472,6 +496,7 @@ mod tests {
         let http = Mock::new(vec![reply(200, r#"{"deactivated":true,"error":null}"#)]);
         assert!(deactivate(&db, &http).unwrap());
         assert!(http.calls.borrow()[0].0.ends_with("/licenses/deactivate"));
+        assert!(http.calls.borrow()[0].1.contains(&("instance_id".into(), "inst-1".into())));
         assert_eq!(db.license_get().unwrap(), None);
         let db = activated_db(0);
         assert!(!deactivate(&db, &Mock::new(vec![Err("offline".into())])).unwrap());
@@ -479,14 +504,23 @@ mod tests {
     }
 
     #[test]
-    fn status_reflects_the_state_machine() {
+    fn removing_an_offline_accepted_key_sends_nothing() {
         let db = Db::open_memory().unwrap();
-        assert_eq!(status(&db, 0).state, "none");
+        activate(&db, &Mock::new(vec![Err("offline".into())]), KEY, "n", 1).unwrap();
+        let http = Mock::new(vec![]);
+        assert!(deactivate(&db, &http).unwrap());
+        assert_eq!(http.count(), 0);
+        assert_eq!(db.license_get().unwrap(), None);
+        assert!(!status(&db).pro);
+    }
+
+    #[test]
+    fn status_reflects_the_stored_key() {
+        let db = Db::open_memory().unwrap();
+        assert_eq!(status(&db).state, "none");
         let db = activated_db(0);
-        let s = status(&db, DAY);
-        assert_eq!((s.pro, s.state, s.key_hint.as_deref()), (true, "active", Some("…1234")));
-        let s = status(&db, 31 * DAY);
-        assert_eq!((s.pro, s.state), (false, "grace-expired"));
+        let s = status(&db);
+        assert_eq!((s.pro, s.state, s.key_hint.as_deref(), s.customer.as_deref()), (true, "active", Some("…1234"), Some("Ada")));
     }
 
     #[test]
@@ -501,66 +535,22 @@ mod tests {
     }
 
     #[test]
-    fn replies_without_a_verdict_never_revoke_pro() {
-        // Proxy / WAF / captive portal answers, empty JSON, error envelopes, wrong status codes.
-        let cases = [
-            (403, r#"{"errors":[{"detail":"forbidden"}]}"#),
-            (401, r#"{"message":"Unauthenticated."}"#),
-            (404, "{}"), // 404 is a verdict status, but without a verdict field it is not a verdict
-            (200, "{}"),
-            (200, r#"{"errors":[{"status":"400"}]}"#),
-            (400, r#"{"error":"something else"}"#),
-            (302, "{}"),
-            (403, r#"{"valid":false,"error":"blocked by firewall"}"#), // even a lookalike verdict from a non-verdict status
-        ];
-        for (status, body) in cases {
-            let db = activated_db(0);
-            let r = revalidate(&db, &Mock::new(vec![reply(status, body)]), 10 * DAY, false);
-            assert_eq!(r, Revalidation::Kept, "{status} {body}");
-            assert!(db.license_get().unwrap().is_some(), "{status} {body}");
-        }
-        // And activation reports "could not reach", not "key invalid".
-        let db = Db::open_memory().unwrap();
-        let e = activate(&db, &Mock::new(vec![reply(403, "{}")]), "k", "n", 0).unwrap_err();
-        assert!(e.contains("Could not reach"), "{e}");
-    }
-
-    #[test]
-    fn a_concurrent_remove_or_new_activation_is_not_undone_by_a_slow_revalidation() {
-        // Revalidation read key A, then (during the HTTP wait) the user removed it: a "valid" answer must not resurrect it.
-        let db = activated_db(0);
-        let old = db.license_get().unwrap().unwrap();
-        db.license_clear().unwrap();
-        assert!(!db.license_renew(&old.key, &old.instance_id, 5 * DAY, Some("x")).unwrap());
-        assert_eq!(db.license_get().unwrap(), None);
-        // A new key was activated meanwhile: neither a renew nor a revoke for the old pair may touch it.
-        let newer = Entitlement { key: "KEY-NEW".into(), instance_id: "inst-2".into(), validated_at: 7, customer: None };
-        db.license_set(&newer).unwrap();
-        assert!(!db.license_renew(&old.key, &old.instance_id, 99, None).unwrap());
-        assert!(!db.license_clear_if(&old.key, &old.instance_id).unwrap());
-        assert_eq!(db.license_get().unwrap(), Some(newer.clone()));
-        // The matching pair does apply.
-        assert!(db.license_renew(&newer.key, &newer.instance_id, 99, Some("Bob")).unwrap());
-        assert_eq!(db.license_get().unwrap().unwrap().validated_at, 99);
-        assert!(db.license_clear_if(&newer.key, &newer.instance_id).unwrap());
-    }
-
-    #[test]
-    fn activating_over_a_cached_key_releases_the_old_instance() {
-        let db = activated_db(0); // KEY-1234 / inst-1
+    fn activating_over_a_stored_key_releases_the_old_instance() {
+        let db = activated_db(0); // KEY / inst-1
         let second = r#"{"activated":true,"license_key":{"status":"active"},"instance":{"id":"inst-9"},"meta":{"customer_name":"Ada"}}"#;
+        let other = "ffffffff-1111-4222-8333-444444444444";
         let http = Mock::new(vec![reply(200, second), reply(200, r#"{"deactivated":true}"#)]);
-        let e = activate(&db, &http, "KEY-OTHER", "n", 5).unwrap();
+        let e = activate(&db, &http, other, "n", 5).unwrap();
         assert_eq!(e.instance_id, "inst-9");
-        assert_eq!(db.license_get().unwrap().unwrap().key, "KEY-OTHER");
+        assert_eq!(db.license_get().unwrap().unwrap().key, other);
         let calls = http.calls.borrow();
         assert!(calls[1].0.ends_with("/licenses/deactivate"));
-        assert!(calls[1].1.contains(&("license_key".into(), "KEY-1234".into())));
+        assert!(calls[1].1.contains(&("license_key".into(), KEY.into())));
         assert!(calls[1].1.contains(&("instance_id".into(), "inst-1".into())));
         // Re-activating the same instance id would not release anything (nothing stale).
         let same = Mock::new(vec![reply(200, ACTIVATED_9)]);
         let db2 = Db::open_memory().unwrap();
-        activate(&db2, &same, "K", "n", 0).unwrap();
+        activate(&db2, &same, KEY, "n", 0).unwrap();
         assert_eq!(same.calls.borrow().len(), 1);
     }
 
@@ -570,7 +560,14 @@ mod tests {
     fn a_failed_release_does_not_fail_activation() {
         let db = activated_db(0);
         let http = Mock::new(vec![reply(200, ACTIVATED_9), Err("offline".into())]);
-        assert!(activate(&db, &http, "KEY-2", "n", 5).is_ok());
+        assert!(activate(&db, &http, "ffffffff-1111-4222-8333-444444444444", "n", 5).is_ok());
+    }
+
+    #[test]
+    fn a_key_for_a_different_product_is_refused_and_its_slot_given_back() {
+        // Only meaningful once the store and product ids are configured; exercise the branch with a mock meta.
+        let m = Some(ApiMeta { store_id: Some(9), product_id: Some(9), customer_name: None });
+        assert!(!product_matches(&m, 1, 2));
     }
 
     #[test]

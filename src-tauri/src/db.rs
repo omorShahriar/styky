@@ -428,18 +428,6 @@ impl Db {
         Ok(())
     }
 
-    /// Update validated_at/customer only if the cached entitlement is still this key + instance.
-    pub fn license_renew(&self, key: &str, instance_id: &str, now: i64, customer: Option<&str>) -> Res<bool> {
-        let n = self
-            .conn()
-            .execute(
-                "UPDATE license SET validated_at = ?1, customer = ?2 WHERE id = 1 AND key = ?3 AND instance_id = ?4",
-                params![now, customer, key, instance_id],
-            )
-            .map_err(err)?;
-        Ok(n > 0)
-    }
-
     /// Delete the cached entitlement only if it is still this key + instance.
     pub fn license_clear_if(&self, key: &str, instance_id: &str) -> Res<bool> {
         let n = self

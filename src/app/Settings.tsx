@@ -15,6 +15,7 @@ import { ProCard } from "./ProCard";
 import { ConnectAI } from "./ConnectAI";
 import { ProPill } from "../components/ProPill";
 import { usePro } from "../lib/pro";
+import { NETWORK_STATEMENT } from "../lib/network";
 import { readProTheme, THEME_KEYS } from "../lib/proTheme";
 import "./Settings.css";
 
@@ -564,7 +565,20 @@ export default function Settings() {
           </Row>
         </Group>
 
-        <Group title="About" footer={store ? undefined : updText}>
+        <Group
+          title="About"
+          footer={
+            <>
+              {!store && updText ? (
+                <>
+                  {updText}
+                  <br />
+                </>
+              ) : null}
+              {NETWORK_STATEMENT}
+            </>
+          }
+        >
           <Row label="Styky">
             <span className="muted tnum">Version {version}</span>
           </Row>

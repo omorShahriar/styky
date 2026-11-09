@@ -38,7 +38,8 @@ to check it. This is the **only** network traffic Pro adds, and it happens only 
 
 Like any internet request, Lemon Squeezy's servers also see your IP address and the app's HTTP request headers. Lemon Squeezy's reply
 (license status, and the buyer's name, which Styky keeps locally to say "Thank you") is stored in the local database on your PC, together
-with the key. The key is not included in Export files. Styky does not check the key again in the background.
+with the key. The key is not included in Export files. If you are offline when you click **Activate**, Styky accepts a
+well-formed key as entered. Styky never checks the key again, in the background or otherwise, so a refund does not turn Pro off.
 
 Nothing else leaves your PC: not your reminders, not your settings, not usage data. The local API, the `styky` command and the MCP
 connector only talk to the Styky app on your own computer through a Windows named pipe that only your Windows user can open; an AI app
