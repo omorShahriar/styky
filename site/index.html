@@ -69,5 +69,22 @@
       </p>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Channel tagging: rewrites hrefs only (no storage, cookies or network). Runs before React mounts, so any
+         Microsoft Store link rendered by React needs the same logic in an effect. -->
+    <script>
+      (() => {
+        const p = location.pathname.replace(/\/$/, "").slice(1);
+        const known = ["sp", "w11", "mcp", "hn", "cai", "registry", "readme", "pro"];
+        const tag = known.includes(p) ? "site-" + p : "site";
+        const set = (sel, key) =>
+          document.querySelectorAll(sel).forEach((a) => {
+            const u = new URL(a.href);
+            u.searchParams.set(key, tag);
+            a.href = u.toString();
+          });
+        set("a[data-store]", "cid");
+        set("a[data-buy]", "checkout[custom][src]");
+      })();
+    </script>
   </body>
 </html>

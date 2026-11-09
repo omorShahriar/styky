@@ -138,6 +138,11 @@ export function Footer() {
           &copy; 2026 {config.author}. Styky is open source under the MIT License. Windows and Windows 11 are
           trademarks of Microsoft; Styky is not affiliated with or endorsed by Microsoft.
         </p>
+        <p className="x-fine">
+          This site counts visits with Cloudflare Web Analytics: no cookies, no personal data. The app has no
+          telemetry. It only goes online to check for updates and, if you use GitHub watch, to ask GitHub about the
+          links you watch.
+        </p>
       </div>
     </footer>
   );

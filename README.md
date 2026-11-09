@@ -21,7 +21,7 @@ claude mcp add styky -- styky mcp             # free: add + list; Pro: complete,
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078d4?logo=windows11&logoColor=white)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white)
 
-[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.pages.dev/) · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal) · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
+[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.pages.dev/readme) · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal) · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
 
 </div>
 

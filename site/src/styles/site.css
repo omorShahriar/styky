@@ -891,6 +891,9 @@ kbd {
   font-size: 13px;
   color: var(--label-3);
 }
+.x-fine + .x-fine {
+  margin-top: 8px;
+}
 
 /* ---------- responsive ---------- */
 @media (max-width: 960px) {
