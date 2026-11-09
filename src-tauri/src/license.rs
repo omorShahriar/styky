@@ -17,7 +17,7 @@ use crate::db::{Db, Res};
 // ---- configuration (owner: fill these in from the Lemon Squeezy dashboard) ------------------
 
 /// Checkout page opened by the "Buy" button.
-pub const STYKY_BUY_URL: &str = "https://styky.lemonsqueezy.com/buy/REPLACE-WITH-CHECKOUT-ID";
+pub const STYKY_BUY_URL: &str = "https://smallhingelabs.lemonsqueezy.com/buy/REPLACE-WITH-CHECKOUT-ID";
 /// Lemon Squeezy store id and product id a key must belong to. `0` = not configured yet: the
 /// check is skipped (anything Lemon issued is accepted). Set both before selling keys.
 pub const LEMON_STORE_ID: u64 = 0;

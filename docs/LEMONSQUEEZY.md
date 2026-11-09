@@ -17,13 +17,16 @@ generates license keys, and it officially supports **bank payouts to Bangladesh*
 
 ## 1. Create the account and store
 
-1. Sign up at <https://app.lemonsqueezy.com/register> with the email you want customers to see on receipts.
+The store belongs to the studio brand **Small Hinge Labs**, not to Styky. Styky Pro is the store's first product, and future apps
+are added as more products in the same store. Each app's license check verifies its own product ID, so keys never cross between apps.
+
+1. Sign up at <https://app.lemonsqueezy.com/register> with the brand address (e.g. `omor@smallhingelabs.com`).
 2. Create a store:
-   - **Store name:** `Styky`
-   - **Store URL / subdomain:** `styky` (this gives `styky.lemonsqueezy.com`; any name works, the app reads the real link from you)
+   - **Store name:** `Small Hinge Labs`
+   - **Store URL / subdomain:** `smallhingelabs` (this gives `smallhingelabs.lemonsqueezy.com`; the app reads the real link from you)
    - **Currency:** USD
-3. **Store details** (Settings → General): add the website `https://styky.pages.dev` and the support link
-   `https://github.com/omorShahriar/styky/issues`. A support email is better if you have one.
+3. **Store details** (Settings → General): website `https://smallhingelabs.com` (until that page exists,
+   `https://styky.pages.dev`) and support `support@smallhingelabs.com`.
 
 ## 2. Get the store approved (activation)
 
@@ -130,7 +133,7 @@ Test-mode products get their own IDs, and the app only accepts keys from the **l
 |---|---|---|
 | **Store ID** (a number) | Settings → **Stores**: the ID next to your store, or the number in the dashboard URL | `LEMON_STORE_ID` in `src-tauri/src/license.rs` |
 | **Product ID** (a number) | Products → Styky Pro: the number in the URL `…/products/<ID>` | `LEMON_PRODUCT_ID` in `src-tauri/src/license.rs` |
-| **Checkout link** | Products → Styky Pro → **Share** → copy the checkout URL (`https://styky.lemonsqueezy.com/buy/<uuid>`) | `STYKY_BUY_URL` in the app; `VITE_LS_CHECKOUT_URL` on the website |
+| **Checkout link** | Products → Styky Pro → **Share** → copy the checkout URL (`https://smallhingelabs.lemonsqueezy.com/buy/<uuid>`) | `STYKY_BUY_URL` in the app; `VITE_LS_CHECKOUT_URL` on the website |
 
 The IDs are not secret (any key's validation response contains them). **Never send your Lemon Squeezy API key**: nothing in Styky
 needs it.
