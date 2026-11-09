@@ -2,7 +2,7 @@
 // (Styky_x64-setup.exe) so the website can link to .../releases/latest/download/Styky_x64-setup.exe forever.
 // Upload both installer names to every release; latest.json keeps pointing at the versioned one.
 // Usage: node scripts/latest-json.mjs <version> "<notes>"
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const [version, notes = ""] = process.argv.slice(2);
@@ -39,3 +39,15 @@ if (!existsSync(join(dir, exe))) {
 }
 copyFileSync(join(dir, exe), stable);
 console.log(`wrote ${stable} (copy of ${exe})`);
+
+// Everything `gh release create` needs, so nothing is forgotten.
+console.log("\nUpload these four files to the release:");
+for (const name of [exe, "Styky_x64-setup.exe", `${exe}.sig`, "latest.json"]) {
+  const p = join(dir, name);
+  if (!existsSync(p)) {
+    console.error(`  MISSING ${p}`);
+    process.exitCode = 1;
+    continue;
+  }
+  console.log(`  ${p} (${statSync(p).size} bytes)`);
+}

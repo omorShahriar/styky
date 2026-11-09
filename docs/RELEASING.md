@@ -16,20 +16,24 @@ with the Styky updater key.
 
 ## Cutting a release
 
-1. Bump `version` in `src-tauri/tauri.conf.json`, `package.json`, `src-tauri/Cargo.toml` (and `src-tauri/Cargo.lock`, which
-   `cargo` updates on the next build) and `site/package.json`, then commit.
+1. Bump `version` in `src-tauri/tauri.conf.json`, `package.json` and `src-tauri/Cargo.toml` (and the `styky` entry in
+   `src-tauri/Cargo.lock`, which `cargo` rewrites on the next build). Add the version's section to `CHANGELOG.md` and copy it to
+   `docs/release-notes/v<version>.md` (the GitHub release notes). Then commit. (`site/` has its own version and reads the release
+   data at build time; leave it alone.)
 2. Run `.\scripts\build.ps1`. It loads the key into `TAURI_SIGNING_PRIVATE_KEY` and runs `pnpm tauri build`. Output is in
    `src-tauri\target\release\bundle\nsis\`:
    - `Styky_<version>_x64-setup.exe`
    - `Styky_<version>_x64-setup.exe.sig`
 3. Generate `latest.json` with `node scripts/latest-json.mjs <version> "<release notes>"`, which writes it to the bundle folder.
-   It also writes `Styky_x64-setup.exe`, an unversioned copy of the installer. Upload it to **every** release (step 4): the website
-   links to `https://github.com/omorShahriar/styky/releases/latest/download/Styky_x64-setup.exe`, so the download button never needs a redeploy.
+   It also writes `Styky_x64-setup.exe`, an unversioned copy of the installer, and ends by listing the four files to upload:
+   the versioned installer, `Styky_x64-setup.exe`, the `.sig` and `latest.json`. Upload `Styky_x64-setup.exe` to **every** release
+   (step 4): the website links to `https://github.com/omorShahriar/styky/releases/latest/download/Styky_x64-setup.exe`, so the
+   download button never needs a redeploy.
 4. Tag and publish:
 
    ```powershell
    git tag v<version>; git push origin v<version>
-   gh release create v<version> --title "Styky <version>" --notes-file <notes.md> `
+   gh release create v<version> --title "Styky <version>" --notes-file docs\release-notes\v<version>.md `
      src-tauri\target\release\bundle\nsis\Styky_<version>_x64-setup.exe `
      src-tauri\target\release\bundle\nsis\Styky_x64-setup.exe `
      src-tauri\target\release\bundle\nsis\Styky_<version>_x64-setup.exe.sig `
