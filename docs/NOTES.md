@@ -226,7 +226,7 @@ Deviations / decisions:
 
 ## Pro v1 notes
 
-Spec and final decisions: `docs/PRO.md`. Everything Pro is in the public repo behind `license::is_pro()` (honor system).
+Everything Pro is in the public repo behind `license::is_pro()` (honor system).
 
 **Schema.** `user_version` is now 5. v3 = `license` table (key, instance_id, validated_at, customer; kept out of `settings` so exports never carry
 the key); v4 = `items.prealert_min / pre_fired_at / last_nag_at`; v5 = `items.repeat_anchor_min` (time of day a series keeps, so a DST gap does not
@@ -248,7 +248,7 @@ migration: it holds the legacy value or an RRULE string (`FREQ=…;INTERVAL=…;
   are added by `src-tauri/tauri.bundle.conf.json`, merged by `scripts/build.ps1` (`cargo build --release --bin styky-cli` first, then `pnpm tauri build --config …`).
   A plain `pnpm tauri build` ships no CLI. NSIS hooks (`installer/hooks.nsh`) call `installer/styky-path.ps1` (registry API, keeps REG_EXPAND_SZ, idempotent, no
   1024-char NSIS string limit) after install and before uninstall.
-- MCP is hand-rolled (see PRO.md). Protocol versions 2025-11-25 / 2025-06-18 / 2025-03-26 / 2024-11-05 are accepted.
+- MCP is hand-rolled (see the header of `cli/mcp.rs`). Protocol versions 2025-11-25 / 2025-06-18 / 2025-03-26 / 2024-11-05 are accepted.
 - The Rust NL parser covers the token grammar plus common date phrases (see the header of `nlp.rs`); it is not chrono-node. Known gaps vs the bar: ranges,
   "next month", month names without a day, 12-hour times without minutes before a date word in odd orders, other languages.
 

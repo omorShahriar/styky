@@ -4,7 +4,7 @@ Maintainer notes for cutting a release. Installed copies check
 `https://github.com/omorShahriar/styky/releases/latest/download/latest.json` for updates, and every update must be signed
 with the Styky updater key.
 
-> Microsoft Store (MSIX) builds are covered in [STORE.md](STORE.md).
+> The Microsoft Store (MSIX) build is covered at the end of this file.
 
 ## One-time setup
 
@@ -16,7 +16,8 @@ with the Styky updater key.
 
 ## Cutting a release
 
-1. Bump `version` in `src-tauri/tauri.conf.json`, `package.json` and `src-tauri/Cargo.toml`, then commit.
+1. Bump `version` in `src-tauri/tauri.conf.json`, `package.json`, `src-tauri/Cargo.toml` (and `src-tauri/Cargo.lock`, which
+   `cargo` updates on the next build) and `site/package.json`, then commit.
 2. Run `.\scripts\build.ps1`. It loads the key into `TAURI_SIGNING_PRIVATE_KEY` and runs `pnpm tauri build`. Output is in
    `src-tauri\target\release\bundle\nsis\`:
    - `Styky_<version>_x64-setup.exe`
@@ -53,3 +54,71 @@ Mark a release as a *pre-release* if it should not be offered as an update.
   }
 }
 ```
+
+## Microsoft Store (MSIX) build
+
+The Store flavor is the same app packaged as **MSIX** by `scripts/build-msix.ps1`. Microsoft signs Store MSIX packages, so no
+code-signing certificate is involved. The NSIS/GitHub build above is unchanged. The package has no CLI or MCP server yet.
+
+### Package identity
+
+Public package metadata (Partner Center → Product management → Product identity), baked into `build-msix.ps1 -Store`:
+
+| Field | Value |
+|---|---|
+| Package/Identity/Name | `omor.dev.Styky` |
+| Package/Identity/Publisher | `CN=150ED2D0-F7B0-4A9D-B63F-68D0C7FDD60C` |
+| Package/Properties/PublisherDisplayName | `omor.dev` (build parameter `-PublisherDisplayName`) |
+| Package Family Name (PFN) | `omor.dev.Styky_d017wbhzahrzj` |
+| Store ID | `9NZ2ZDFQJLB5` |
+
+Windows uses the PFN for the installed app. Toasts show under the AUMID `omor.dev.Styky_d017wbhzahrzj!Styky`, and the app's
+`%APPDATA%\com.styky.app` data is redirected by MSIX file virtualization to
+`%LOCALAPPDATA%\Packages\omor.dev.Styky_d017wbhzahrzj\LocalCache\Roaming\com.styky.app\`. It is deleted on uninstall and is separate from
+the NSIS install's database; Settings → Export / Import moves reminders between the two.
+
+A Partner Center upload is checked against the account's current publisher display name, so build with the
+`-PublisherDisplayName` the account has at that moment.
+
+### Build
+
+Prerequisites: the normal build tools (Node, pnpm, Rust, VS Build Tools) plus the Windows 10/11 SDK. The script installs the SDK
+through `winget` if `makeappx.exe` is missing.
+
+```powershell
+.\scripts\build-msix.ps1 -Store
+```
+
+`-Store` uses the identity above and builds **unsigned**, which is what Partner Center expects (the Store signs after
+certification). Add `-SkipBuild` to reuse an existing `src-tauri\target\release\styky.exe`, but only if no `.rs`/`.ts` file changed since
+that build.
+
+Output: `dist-msix\Styky_<version>_x64.msix` (git-ignored). The version is `src-tauri/tauri.conf.json` with a `.0` appended
+(`0.2.0` becomes `0.2.0.0`; the Store reserves the 4th part and every submission needs a higher version than the last).
+
+**Local test:** run the script with no switches. It uses a `Styky.LocalTest` identity and a throwaway self-signed certificate
+(the private key is deleted right after signing). Then turn on **Developer Mode** (Settings → System → Advanced → For developers),
+or in an **admin** PowerShell trust the printed `.cer`, and install:
+
+```powershell
+Import-Certificate -FilePath dist-msix\styky-test.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+Add-AppxPackage dist-msix\Styky_0.2.0.0_x64.msix
+```
+
+Remove it with `Get-AppxPackage Styky.LocalTest | Remove-AppxPackage`. Do not run the Store build and the NSIS build at the same
+time: they share the app identifier, the single-instance lock and the quick-add hotkey. Never do any of this from inside a Claude
+desktop app session (it is MSIX-packaged, so processes it starts see virtualized files and registry).
+
+### What differs in the Store flavor
+
+- The updater plugin is not registered when `store::is_store()` (packaged at runtime, or built with `--features store`), and
+  Settings hides the Updates row. Updates come from the Store.
+- Launch at login uses the manifest `windows.startupTask` (`StykyStartup`, enabled by default); a user who disabled it in Task
+  Manager sees a hint in Settings.
+- The manifest declares `runFullTrust` and `MinVersion` 10.0.17763.0 (Windows 10 1809).
+
+### Later versions
+
+Bump the version everywhere (see "Cutting a release"), rebuild with the same identity values and create a new submission in the
+same product, uploading the new `.msix`. `docs/NOTES.md` → "Store (MSIX) notes" has the longer record of what was and was not
+verified under MSIX.

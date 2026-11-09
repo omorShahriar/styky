@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Tauri has no MSIX bundler, so this stages styky.exe + tile assets + AppxManifest.xml and packs them with makeappx.
-  Identity values come from Partner Center (see docs/STORE.md). Defaults are local-test placeholders.
+  Identity values come from Partner Center (see docs/RELEASING.md). Defaults are local-test placeholders.
 
   Store upload: .\scripts\build-msix.ps1 -Store               (real Partner Center identity, unsigned)
   Local test:   .\scripts\build-msix.ps1                      (self-signed, writes a .cer to trust)

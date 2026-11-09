@@ -2,7 +2,7 @@
 <!--
   Template. scripts/build-msix.ps1 replaces the {{TOKENS}}.
   Identity Name / Publisher / PublisherDisplayName come from Partner Center
-  (Product identity page); see docs/STORE.md.
+  (Product identity page); see docs/RELEASING.md.
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"

@@ -64,7 +64,7 @@ and run it.
 - From v0.2.0 the installer also puts the `styky` command on your user `PATH` (open a new terminal afterwards).
 - Styky starts at login by default. You can change that in Settings.
 - Requires Windows 10 1809+ / Windows 11 (the WebView2 runtime is already part of Windows 11).
-- **Microsoft Store:** a listing is in review (see [docs/STORE.md](docs/STORE.md)). The Store build does not include the `styky` CLI or MCP server yet; use the GitHub installer for those.
+- **Microsoft Store:** a listing is in review. The Store build does not include the `styky` CLI or MCP server yet; use the GitHub installer for those.
 
 > Windows SmartScreen may warn about an unrecognized app because the installer isn't Authenticode-signed yet. Click
 > **More info → Run anyway**. Updates are cryptographically signed and verified by the app itself.
@@ -237,7 +237,6 @@ Styky stays free and MIT-licensed, and nothing that was free becomes paid. **Sty
 
 It runs on the honor system: the code is in this repo behind a license check, and you can build it yourself. Buying supports
 the project and gets you the signed, auto-updating build. Details: **[styky.smallhingelabs.com](https://styky.smallhingelabs.com/#pricing)**.
-Design notes: [docs/PRO.md](docs/PRO.md).
 
 ## Known limitations
 

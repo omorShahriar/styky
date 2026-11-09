@@ -9,8 +9,8 @@ say so in your report instead of silently picking one.
 ## Where things are
 - App: `src/` (React) and `src-tauri/src/` (Rust). The CLI is a second binary, `src-tauri/src/cli/`. The marketing site is `site/`
   (its own `package.json`; run `pnpm install --ignore-workspace` there).
-- Notes, handoffs and known gotchas: `docs/NOTES.md`. Pro design: `docs/PRO.md`. Release steps: `docs/RELEASING.md`.
-  Store packaging: `docs/STORE.md`. Privacy policy: `docs/PRIVACY.md`.
+- Notes, handoffs and known gotchas: `docs/NOTES.md`. Release steps and Store (MSIX) packaging: `docs/RELEASING.md`.
+  Privacy policy: `docs/PRIVACY.md`.
 
 ## Checks to keep green
 - `pnpm test`, `pnpm tsc --noEmit`, and for the site `pnpm typecheck` and `pnpm build` (in `site/`).

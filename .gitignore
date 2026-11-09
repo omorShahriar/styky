@@ -28,3 +28,9 @@ dist-msix*/
 *.cer
 dist-store/
 private/
+
+# internal docs kept locally, out of the public tree
+docs/PRO.md
+docs/LEMONSQUEEZY.md
+docs/STORE.md
+docs/PRODUCT_CONTEXT.md
