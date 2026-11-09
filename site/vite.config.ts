@@ -12,6 +12,17 @@ const base = process.env.SITE_BASE || "/";
 /** Absolute site URL, used for canonical / OG tags. */
 const siteUrl = (process.env.SITE_URL || "https://styky.smallhingelabs.com/").replace(/\/?$/, "/");
 
+/**
+ * C8 (LOCKED): no public MCP or CLI claims until a release that contains them is published (v0.2.0).
+ * Everything that talks about agents, Claude, MCP, the CLI, the terminal or git hooks is behind this one flag and is
+ * absent from the build (HTML and JS) while it is false. After v0.2.0 is published, change `false` to `true` below
+ * (or build once with SHOW_AGENT_FEATURES=true). The head metadata in index.html is separate: see docs/RELEASING.md.
+ */
+const SHOW_AGENT_FEATURES_DEFAULT = false;
+const showAgentFeatures = process.env.SHOW_AGENT_FEATURES
+  ? process.env.SHOW_AGENT_FEATURES === "true"
+  : SHOW_AGENT_FEATURES_DEFAULT;
+
 /** The app's real `src/lib/api.ts` (Tauri invoke wrappers) is swapped for the in-memory mock. */
 function mockApi(): Plugin {
   const real = path.join(appSrc, "lib", "api.ts");
@@ -53,6 +64,7 @@ const exact = (name: string) => new RegExp(`^${name.replace(/[/@.-]/g, "\$&")}$`
 // https://vite.dev/config/
 export default defineConfig({
   base,
+  define: { __SHOW_AGENT_FEATURES__: JSON.stringify(showAgentFeatures) },
   plugins: [react(), mockApi(), htmlVars(), cleanLegalUrls()],
   resolve: {
     alias: [

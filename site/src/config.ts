@@ -36,6 +36,17 @@ export const proTeaser = {
   line: "Styky is free. Pro is how it stays that way.",
 } as const;
 
+/** C8 flag, set in vite.config.ts (SHOW_AGENT_FEATURES_DEFAULT). False means no agent/MCP/CLI copy is in the build. */
+declare const __SHOW_AGENT_FEATURES__: boolean;
+export const SHOW_AGENT_FEATURES: boolean = __SHOW_AGENT_FEATURES__;
+
+/** The approved plain description (also the meta description). Used where a CLI/MCP sentence has to be replaced. */
+export const APPROVED_DESCRIPTION =
+  "A small desktop reminder widget for Windows 11. It stays visible after Win+D and nudges you with notifications you can act on.";
+
+/** The approved tagline. Replaces a headline that carried a CLI/MCP claim. */
+export const TAGLINE = "Remember the small stuff that breaks big things.";
+
 /** The release that introduced the CLI and the MCP server. */
 export const proVersion = "0.2.0";
 

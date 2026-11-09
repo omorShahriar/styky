@@ -4,24 +4,27 @@
 
 # Styky
 
-**Reminders you control from Claude, your terminal and git hooks.**
+**Remember the small stuff that breaks big things.**
 
-A free, open-source Windows reminder widget with a local CLI and MCP server. Add a reminder with `Ctrl+Alt+N`,
-`styky add "Deploy api fri 5pm #infra !!"` or a git hook. Get a native notification when it is due, with Done and
-Snooze on it. The always-visible glass panel on your desktop shows what is coming. Local-first: no account, no cloud,
+A small desktop reminder widget for Windows 11. It stays visible after Win+D and nudges you with notifications you can act on.
+Get a native notification when it is due, with Done and Snooze on it. The always-visible glass panel on your desktop shows what is coming. Local-first: no account, no cloud,
 no telemetry.
 
+<!-- [[MCP BLOCK]] -->
+<!--
 ```powershell
 styky add "Deploy api fri 5pm #infra !!"      # free
 claude mcp add styky -- styky mcp             # free: all seven tools
 ```
+-->
+<!-- [[/MCP BLOCK]] -->
 
 [![Latest release](https://img.shields.io/github/v/release/omorShahriar/styky?label=download&color=7c5cff)](https://github.com/omorShahriar/styky/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078d4?logo=windows11&logoColor=white)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white)
 
-[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.smallhingelabs.com/readme) · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal) · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
+[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.smallhingelabs.com/readme) <!-- [[MCP BLOCK]] --><!-- · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal)--><!-- [[/MCP BLOCK]] --> · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
 
 </div>
 
@@ -32,8 +35,13 @@ claude mcp add styky -- styky mcp             # free: all seven tools
 Task managers are great for projects, but the most dangerous tasks are the small, single ones that live only in your head
 until it's too late: *deploy on Friday*, *rotate the keys*, *check CI after the push*. Styky is built around three ideas:
 
+- **Set it from anywhere.** `Ctrl+Alt+N` from any app.
+<!-- [[MCP BLOCK]] -->
+<!--
 - **Set it from anywhere.** `Ctrl+Alt+N` from any app, `styky add` from a terminal or git hook, or ask Claude through MCP.
   They all share one grammar: `Deploy api fri 5pm #infra !!`.
+-->
+<!-- [[/MCP BLOCK]] -->
 - **It tells you on time.** A native Windows notification fires when the reminder is due, with **Done** and **Snooze**
   on it. Every priority, Critical (`!!!`) included, is free. With Pro you can switch on **Nag** for a reminder, on any
   priority, and it re-notifies every 10 minutes (configurable) until you complete or snooze it.
@@ -61,16 +69,27 @@ until it's too late: *deploy on Friday*, *rotate the keys*, *check CI after the 
 and run it.
 
 - It installs **per user**, with no admin prompt, and adds a Start menu entry.
+<!-- [[MCP BLOCK]] -->
+<!--
 - From v0.2.0 the installer also puts the `styky` command on your user `PATH` (open a new terminal afterwards).
+-->
+<!-- [[/MCP BLOCK]] -->
 - Styky starts at login by default. You can change that in Settings.
 - Requires Windows 10 1809+ / Windows 11 (the WebView2 runtime is already part of Windows 11).
+- **Microsoft Store:** a listing is in review.
+<!-- [[MCP BLOCK]] -->
+<!--
 - **Microsoft Store:** a listing is in review. The Store build does not include the `styky` CLI or MCP server yet; use the GitHub installer for those.
+-->
+<!-- [[/MCP BLOCK]] -->
 
 > Windows SmartScreen may warn about an unrecognized app because the installer isn't Authenticode-signed yet. Click
 > **More info → Run anyway**. Updates are cryptographically signed and verified by the app itself.
 
 Uninstall from *Settings → Apps → Installed apps → Styky*. Your data is kept (see [Your data](#your-data)).
 
+<!-- [[MCP BLOCK]] -->
+<!--
 ## Use it from Claude, ChatGPT and the terminal
 
 *New in v0.2.0.* Styky ships a `styky` command and a local MCP server. Both talk to the **running** Styky app over a
@@ -175,6 +194,8 @@ endpoint for it is on the roadmap and not shipped. Until then, use the CLI from 
 
 > Privacy note: what an assistant reads through these tools (titles, due times, notes) goes to that assistant. Connect only
 > clients you trust. Styky itself sends nothing anywhere.
+-->
+<!-- [[/MCP BLOCK]] -->
 
 ## Using Styky
 

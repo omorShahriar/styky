@@ -15,7 +15,10 @@ export function Github({ size = 18 }: { size?: number; strokeWidth?: number }) {
 
 /** Light/dark switch. `onChange` lets the homepage keep the live demo's mocked theme setting in step. */
 export function ThemeToggle({ onChange }: { onChange?: (t: "light" | "dark") => void }) {
-  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme ?? "light");
+  // `document` does not exist while the legal pages are prerendered at build time.
+  const [theme, setTheme] = useState(() =>
+    typeof document === "undefined" ? "light" : (document.documentElement.dataset.theme ?? "light"),
+  );
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);

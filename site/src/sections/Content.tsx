@@ -11,7 +11,7 @@ import {
   Rocket,
   Zap,
 } from "lucide-react";
-import { config, NETWORK_STATEMENT } from "../config";
+import { config, NETWORK_STATEMENT, SHOW_AGENT_FEATURES } from "../config";
 import { Reveal, SectionHead } from "./util";
 
 export function Problem() {
@@ -19,7 +19,9 @@ export function Problem() {
     {
       icon: Zap,
       title: "Set it from anywhere",
-      text: "Ctrl+Alt+N from any app, styky add from a terminal or a git hook, or ask Claude. One grammar for all of them: Deploy api fri 5pm #infra !!",
+      text: SHOW_AGENT_FEATURES
+        ? "Ctrl+Alt+N from any app, styky add from a terminal or a git hook, or ask Claude. One grammar for all of them: Deploy api fri 5pm #infra !!"
+        : "Ctrl+Alt+N from any app. Deploy api fri 5pm #infra !!",
     },
     {
       icon: BellRing,
@@ -42,8 +44,8 @@ export function Problem() {
             head <s>until it&rsquo;s too late.</s>
           </p>
           <p className="x-lead" style={{ fontSize: 16 }}>
-            Not a project, not a ticket. Styky is where your tools and your assistant can put them, and where you can
-            see them.
+            Not a project, not a ticket.
+            {SHOW_AGENT_FEATURES ? " Styky is where your tools and your assistant can put them, and where you can see them." : ""}
           </p>
         </Reveal>
         <div className="x-steps">
@@ -69,8 +71,20 @@ export function Problem() {
 const FEATURES: { icon: typeof Zap; title: string; text: string; pro?: boolean }[] = [
   { icon: Plus, title: "Global quick add", text: "A Spotlight-style bar with natural-language dates, #tags, @branch, !! priority, repeats and links. One shortcut, from any app." },
   { icon: BellRing, title: "Native notifications", text: "Windows toasts with a Snooze dropdown (10 min, 1 hour, this evening, tomorrow, custom) and Done." },
-  { icon: Zap, title: "Priorities", text: "Low, normal, urgent and critical, from the editor, quick-add (!!, !!!), the CLI or MCP." },
-  { icon: Code2, title: "Built for developers", text: "A branch chip (@release/2.3) that copies on click, a link field, project tags, and a CLI and MCP server." },
+  {
+    icon: Zap,
+    title: "Priorities",
+    text: SHOW_AGENT_FEATURES
+      ? "Low, normal, urgent and critical, from the editor, quick-add (!!, !!!), the CLI or MCP."
+      : "Low, normal, urgent and critical, from the editor or quick-add (!!, !!!).",
+  },
+  {
+    icon: Code2,
+    title: "Built for developers",
+    text: SHOW_AGENT_FEATURES
+      ? "A branch chip (@release/2.3) that copies on click, a link field, project tags, and a CLI and MCP server."
+      : "A branch chip (@release/2.3) that copies on click, a link field and project tags.",
+  },
   { icon: Repeat, title: "Repeats that behave", text: "Daily, weekdays, weekly, monthly, with the 31st clamped to shorter months. Pro adds every 2 weeks, Mon/Wed/Fri, the last Friday of the month, end after N times." },
   { icon: FileText, title: "Markdown details", text: "Notes, code, links and checklists you can tick, right in the widget." },
   { icon: AppWindow, title: "A desktop panel", text: "A resizable Acrylic glass panel on the desktop layer that follows light and dark mode and your accent color. Pro adds tint, density and a paper skin." },
@@ -162,8 +176,12 @@ export function Privacy() {
     ["No account, no cloud.", "There is no sign-up and no server to sync to."],
     ["No telemetry.", "No analytics, ads or crash reporting. Styky never learns how you use it."],
     ["Your data is a file.", "Reminders live in a local SQLite database. Export or import JSON any time."],
-    ["A private local API.", "The CLI and MCP server use a named pipe restricted to your Windows account. Nothing listens on the network."],
-    ["Your assistant, your call.", "If you connect Claude or another client, what it reads from Styky goes to that assistant."],
+    ...(SHOW_AGENT_FEATURES
+      ? [
+          ["A private local API.", "The CLI and MCP server use a named pipe restricted to your Windows account. Nothing listens on the network."],
+          ["Your assistant, your call.", "If you connect Claude or another client, what it reads from Styky goes to that assistant."],
+        ]
+      : []),
     ["Open source.", "Read every line on GitHub, or build it yourself."],
   ];
   return (
@@ -243,29 +261,40 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     q: "What works without Pro?",
     a: (
       <p>
-        Everything in the panel, every priority including Critical, the whole <code>styky</code> CLI and all seven MCP
-        tools. Pro adds advanced repeats, nagging, early warnings and themes.
+        {SHOW_AGENT_FEATURES ? (
+          <>
+            Everything in the panel, every priority including Critical, the whole <code>styky</code> CLI and all seven
+            MCP tools.
+          </>
+        ) : (
+          "Everything in the panel, and every priority including Critical."
+        )}{" "}
+        Pro adds advanced repeats, nagging, early warnings and themes.
       </p>
     ),
   },
-  {
-    q: "Does the Styky app have to be running for the CLI?",
-    a: (
-      <p>
-        Yes. <code>styky</code> talks to the running app, so with Styky closed you get &ldquo;Styky isn&rsquo;t
-        running&rdquo; and exit code 2. Styky starts with Windows by default.
-      </p>
-    ),
-  },
-  {
-    q: "Does it work with ChatGPT?",
-    a: (
-      <p>
-        Not directly. ChatGPT only connects to remote HTTPS MCP servers, and <code>styky mcp</code> is a local one.
-        Claude Desktop, Claude Code and other clients that launch a local command work today.
-      </p>
-    ),
-  },
+  ...(SHOW_AGENT_FEATURES
+    ? [
+        {
+          q: "Does the Styky app have to be running for the CLI?",
+          a: (
+            <p>
+              Yes. <code>styky</code> talks to the running app, so with Styky closed you get &ldquo;Styky
+              isn&rsquo;t running&rdquo; and exit code 2. Styky starts with Windows by default.
+            </p>
+          ),
+        },
+        {
+          q: "Does it work with ChatGPT?",
+          a: (
+            <p>
+              Not directly. ChatGPT only connects to remote HTTPS MCP servers, and <code>styky mcp</code> is a local
+              one. Claude Desktop, Claude Code and other clients that launch a local command work today.
+            </p>
+          ),
+        },
+      ]
+    : []),
   {
     q: "How many devices does a license cover?",
     a: <p>About three of your own PCs. Activation needs the internet once; after that Pro works offline.</p>,
@@ -287,8 +316,10 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     q: "Is there a Microsoft Store version?",
     a: (
       <p>
-        A Store listing is in review. The CLI and MCP server ship with the installer on GitHub Releases; the Store
-        build does not include them yet.
+        A Store listing is in review.
+        {SHOW_AGENT_FEATURES
+          ? " The CLI and MCP server ship with the installer on GitHub Releases; the Store build does not include them yet."
+          : ""}
       </p>
     ),
   },

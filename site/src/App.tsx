@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { SHOW_AGENT_FEATURES } from "./config";
 import { Hero, Nav } from "./sections/Chrome";
 import { Footer } from "./sections/Shell";
 import { Connect } from "./sections/Connect";
@@ -16,7 +17,7 @@ export default function App() {
       <Nav />
       <main>
         <Hero />
-        <Connect />
+        {SHOW_AGENT_FEATURES ? <Connect /> : null}
         <Problem />
         <Suspense fallback={<section className="x-section alt" id="quick-add" style={{ minHeight: 640 }} />}>
           <Grammar />

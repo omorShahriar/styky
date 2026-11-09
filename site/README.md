@@ -83,7 +83,18 @@ link, no email form. The full /pro page replaces it later.
 
 The one canonical network statement is `NETWORK_STATEMENT` in `src/config.ts`; keep it byte-identical with `docs/PRIVACY.md` and
 the README. `/refund`, `/terms` and `/privacy` are separate pages (`refund.html`, `terms.html`, `privacy.html`, rendered by
-`src/legal.tsx` from `src/sections/LegalPages.tsx`); Cloudflare Pages serves them at the clean URLs.
+`src/legal.tsx` from `src/sections/LegalPages.tsx`); Cloudflare Pages serves them at the clean URLs. `pnpm build` runs
+`scripts/prerender.mjs` after `vite build`, which writes each page's markup into `dist/<page>.html`, so the raw HTML has the page's
+own content, title and canonical without running JavaScript (the homepage stays client-rendered).
+
+## Agent / MCP / CLI copy (rule C8)
+
+Nothing about AI agents, Claude, MCP, the CLI, the terminal or git hooks is public until a release that contains them is published
+(v0.2.0). All of that copy is behind one build-time flag, `SHOW_AGENT_FEATURES_DEFAULT` in `vite.config.ts` (read in the app as
+`SHOW_AGENT_FEATURES` from `src/config.ts`). While it is `false` the sections are absent from the build, not just hidden with CSS, and
+the places where a sentence carried a claim show the approved plain wording instead. To preview the full site, build once with
+`SHOW_AGENT_FEATURES=true pnpm build`. The `<title>`, meta, Open Graph and JSON-LD text in `index.html` is static and is not
+controlled by the flag; edit it by hand when the claims go public.
 
 ## Files
 

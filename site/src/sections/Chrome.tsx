@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Download, Star } from "lucide-react";
-import { config } from "../config";
+import { APPROVED_DESCRIPTION, config, SHOW_AGENT_FEATURES, TAGLINE } from "../config";
 import { setSiteTheme } from "../mock/site-theme";
 import { release } from "../release";
 import { Github, ThemeToggle } from "./Shell";
@@ -19,7 +19,7 @@ export function Nav() {
           Styky
         </a>
         <nav className="x-nav-links" aria-label="Sections">
-          <a href="#connect">Claude &amp; CLI</a>
+          {SHOW_AGENT_FEATURES ? <a href="#connect">Claude &amp; CLI</a> : null}
           <a href="#quick-add">Quick add</a>
           <a href="#features">Features</a>
           <a href="#privacy">Privacy</a>
@@ -43,14 +43,23 @@ export function Hero() {
     <section className="x-hero" id="top">
       <div className="x-wrap">
         <div className="x-hero-copy">
-          <h1 className="x-h1">
-            Reminders you control from <em>Claude, your terminal and git hooks.</em>
-          </h1>
-          <p className="x-lead">
-            Styky is a free, open-source Windows reminder widget with a local CLI and MCP server. Add from anywhere with
-            Ctrl+Alt+N or <code>styky add</code>, and get a native notification with Done and Snooze when it is
-            due.
-          </p>
+          {SHOW_AGENT_FEATURES ? (
+            <>
+              <h1 className="x-h1">
+                Reminders you control from <em>Claude, your terminal and git hooks.</em>
+              </h1>
+              <p className="x-lead">
+                Styky is a free, open-source Windows reminder widget with a local CLI and MCP server. Add from anywhere
+                with Ctrl+Alt+N or <code>styky add</code>, and get a native notification with Done and Snooze when it
+                is due.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="x-h1">{TAGLINE}</h1>
+              <p className="x-lead">{APPROVED_DESCRIPTION}</p>
+            </>
+          )}
           <div className="x-cta">
             <a className="x-btn primary" href={config.downloadUrl} rel="noopener">
               <Download size={18} strokeWidth={2} /> Download for Windows
@@ -60,14 +69,18 @@ export function Hero() {
               {stars != null && stars >= 10 ? <span className="tnum">{stars.toLocaleString()}</span> : null}
               <span>{stars != null && stars >= 10 ? "stars on GitHub" : "Star on GitHub"}</span>
             </a>
-            <a className="x-btn secondary" href="#connect">
-              See the commands
-            </a>
+            {SHOW_AGENT_FEATURES ? (
+              <a className="x-btn secondary" href="#connect">
+                See the commands
+              </a>
+            ) : null}
           </div>
-          <pre className="x-term x-hero-term" aria-label="Example commands">
-            <i>$ </i>styky add &quot;Deploy api fri 5pm #infra !!&quot;{"\n"}
-            <i>$ </i>claude mcp add styky -- styky mcp
-          </pre>
+          {SHOW_AGENT_FEATURES ? (
+            <pre className="x-term x-hero-term" aria-label="Example commands">
+              <i>$ </i>styky add &quot;Deploy api fri 5pm #infra !!&quot;{"\n"}
+              <i>$ </i>claude mcp add styky -- styky mcp
+            </pre>
+          ) : null}
           <p className="x-meta">
             Free and open source (MIT) · v{version} · Windows 10 &amp; 11 · Per-user install, no admin prompt
           </p>
