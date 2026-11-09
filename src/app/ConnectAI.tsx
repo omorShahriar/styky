@@ -98,8 +98,8 @@ export function ConnectAI() {
           ))}
           {failed && <p className="inline-error">Couldn&rsquo;t copy automatically; select the text and press Ctrl+C.</p>}
           <p className="muted small ai-tier">
-            Adding and listing reminders is free.{" "}
-            {pro ? "Completing, snoozing, editing and deleting are unlocked." : <>Completing, snoozing, editing and deleting need Styky Pro <ProPill /></>}
+            Every command and tool is free.{" "}
+            {pro ? "Advanced repeats are unlocked." : <>Advanced repeats (like &ldquo;every 2 weeks&rdquo;) need Styky Pro <ProPill /></>}
           </p>
         </div>
       </div>

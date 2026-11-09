@@ -13,7 +13,7 @@ coming. Local-first: no account, no cloud, no telemetry.
 
 ```powershell
 styky add "Deploy api fri 5pm #infra !!"      # free
-claude mcp add styky -- styky mcp             # free: add + list; Pro: complete, snooze, edit, delete
+claude mcp add styky -- styky mcp             # free: all seven tools
 ```
 
 [![Latest release](https://img.shields.io/github/v/release/omorShahriar/styky?label=download&color=7c5cff)](https://github.com/omorShahriar/styky/releases/latest)
@@ -87,26 +87,27 @@ styky --version
 
 ### CLI
 
-| Command | What it does | Tier |
-|---|---|---|
-| `styky add <text...> [--json]` | Add a reminder from a natural-language line (same grammar as `Ctrl+Alt+N`) | Free |
-| `styky ls [--today \| --overdue] [--tag <t>] [--done \| --all] [--json]` | List reminders (open by default) | Free |
-| `styky get <id> [--json]` | Show one reminder with its notes | **Pro** |
-| `styky done <id>` | Complete it (a repeating reminder rolls to its next time) | **Pro** |
-| `styky snooze <id> <when>` | e.g. `1h`, `30m`, `"tomorrow 9am"` | **Pro** |
-| `styky edit <id> [--title t] [--due when\|none] [--tag t] [--priority low\|normal\|urgent\|critical] [--notes n] [--repeat r] [--link u] [--branch b]` | Change fields | **Pro** |
-| `styky rm <id>` | Delete it | **Pro** |
-| `styky mcp` | Run the MCP server on stdio | Free (tools below are tiered) |
+| Command | What it does |
+|---|---|
+| `styky add <text...> [--json]` | Add a reminder from a natural-language line (same grammar as `Ctrl+Alt+N`) |
+| `styky ls [--today \| --overdue] [--tag <t>] [--done \| --all] [--json]` | List reminders (open by default) |
+| `styky get <id> [--json]` | Show one reminder with its notes |
+| `styky done <id>` | Complete it (a repeating reminder rolls to its next time) |
+| `styky snooze <id> <when>` | e.g. `1h`, `30m`, `"tomorrow 9am"` |
+| `styky edit <id> [--title t] [--due when\|none] [--tag t] [--priority low\|normal\|urgent\|critical] [--notes n] [--repeat r] [--link u] [--branch b]` | Change fields |
+| `styky rm <id>` | Delete it |
+| `styky mcp` | Run the MCP server on stdio |
 
-`<id>` is the 8-character id shown by `styky ls`; any unique prefix works. Pro commands on a free build print
-`requires Styky Pro` and exit with code 3.
+Every command is free. `<id>` is the 8-character id shown by `styky ls`; any unique prefix works. A request that
+uses a Pro feature (an advanced repeat such as `FREQ=WEEKLY;INTERVAL=2`) is refused on its own: the CLI prints
+`Advanced repeats is a Styky Pro feature: https://styky.smallhingelabs.com/pro` and exits with code 3.
 
 ```powershell
 styky add "Deploy api fri 5pm #infra !!"
 styky ls --today
 styky ls --overdue --tag infra --json
 styky add "Rotate prod keys fri 10am #infra !!!"    # !!! = Critical (Pro); free builds treat it as Urgent
-styky done a1b2c3d4                                 # Pro
+styky done a1b2c3d4
 ```
 
 ### Git hook
@@ -126,17 +127,19 @@ exit 0
 `styky mcp` is a stdio MCP server (protocol versions 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05 are accepted). It
 exposes seven tools:
 
-| Tool | Purpose | Tier |
-|---|---|---|
-| `styky_add` | Add a reminder from `text` (natural language) or explicit fields: `title`, `due`, `tag`, `priority` (`low`/`normal`/`urgent`/`critical`), `repeat`, `notes`, `link`, `branch` | Free |
-| `styky_list` | List reminders; filter by `due` (`today`/`overdue`/`any`), `tag`, `status` (`open`/`done`/`all`) | Free |
-| `styky_get` | One reminder with all fields, including notes | **Pro** |
-| `styky_complete` | Mark done (repeating reminders roll forward) | **Pro** |
-| `styky_snooze` | Notify again at a given time | **Pro** |
-| `styky_update` | Change fields; `due: null` clears the due time | **Pro** |
-| `styky_delete` | Permanently delete | **Pro** |
+| Tool | Purpose |
+|---|---|
+| `styky_add` | Add a reminder from `text` (natural language) or explicit fields: `title`, `due`, `tag`, `priority` (`low`/`normal`/`urgent`/`critical`), `repeat`, `notes`, `link`, `branch` |
+| `styky_list` | List reminders; filter by `due` (`today`/`overdue`/`any`), `tag`, `status` (`open`/`done`/`all`) |
+| `styky_get` | One reminder with all fields, including notes |
+| `styky_complete` | Mark done (repeating reminders roll forward) |
+| `styky_snooze` | Notify again at a given time |
+| `styky_update` | Change fields; `due: null` clears the due time |
+| `styky_delete` | Permanently delete |
 
-Pro tools on a free build return a plain `requires_pro` error that the assistant can relay.
+All seven tools are free. A request that uses a Pro feature (an advanced repeat) comes back as a tool error with the
+code `requires_pro`, the feature name and the link, plus a plain sentence the assistant can relay. The rest of the
+tool keeps working.
 
 **Claude Code**
 

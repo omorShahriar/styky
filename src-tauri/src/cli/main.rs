@@ -2,14 +2,15 @@
 //!
 //!   styky add "Release v2.3 fri 5pm #api !!"      add a reminder (natural language, same grammar as quick-add)
 //!   styky ls [--today|--overdue] [--tag x] [--done|--all] [--json]
-//!   styky get <id>                                (Pro)
-//!   styky done <id>                               (Pro)
-//!   styky snooze <id> 1h|30m|"tomorrow 9am"       (Pro)
-//!   styky edit <id> [--title t] [--due when|none] [--tag t] [--priority p] [--notes n]   (Pro)
-//!   styky rm <id>                                 (Pro)
+//!   styky get <id>
+//!   styky done <id>
+//!   styky snooze <id> 1h|30m|"tomorrow 9am"
+//!   styky edit <id> [--title t] [--due when|none] [--tag t] [--priority p] [--notes n]
+//!   styky rm <id>
 //!   styky mcp                                     run an MCP server on stdio for Claude / ChatGPT / any MCP client
 //!
-//! `add` and `ls` are free; the rest need Styky Pro (the app answers with a clear error).
+//! Every command is free. A request that uses a Pro feature (for example an advanced repeat) is refused on its own:
+//! the app answers `requires_pro`, and the CLI prints "<Feature> is a Styky Pro feature: <url>" and exits with 3.
 
 #[path = "../proto.rs"]
 mod proto;
@@ -27,14 +28,15 @@ const HELP: &str = "styky - control the running Styky app from the command line
 USAGE
   styky add <text...> [--json]      add a reminder: styky add \"Release v2.3 fri 5pm #api !!\"
   styky ls [--today | --overdue] [--tag <t>] [--done | --all] [--json]
-  styky get <id> [--json]           (Styky Pro)
-  styky done <id>                   (Styky Pro)
-  styky snooze <id> <when>          (Styky Pro)  e.g. 1h, 30m, \"tomorrow 9am\"
-  styky edit <id> [--title t] [--due when|none] [--tag t] [--priority low|normal|urgent|critical] [--notes n] [--repeat r]   (Styky Pro)
-  styky rm <id>                     (Styky Pro)
+  styky get <id> [--json]
+  styky done <id>
+  styky snooze <id> <when>          e.g. 1h, 30m, \"tomorrow 9am\"
+  styky edit <id> [--title t] [--due when|none] [--tag t] [--priority low|normal|urgent|critical] [--notes n] [--repeat r]
+  styky rm <id>
   styky mcp                         run an MCP server on stdio (for Claude, ChatGPT, any MCP client)
 
-<id> is the 8-character id shown by `styky ls` (any unique prefix works). `add` and `ls` are free.";
+<id> is the 8-character id shown by `styky ls` (any unique prefix works).
+Every command is free. Pro features (advanced repeats) are refused with exit code 3.";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -57,12 +59,17 @@ pub fn run(args: &[String], call: CallFn, out: &mut String) -> i32 {
         Ok(()) => 0,
         Err(e) => {
             out.clear();
-            out.push_str(&format!("styky: {}\n", e.message));
+            // A Pro refusal is already a full sentence ("<Feature> is a Styky Pro feature: <url>").
+            if e.code == proto::REQUIRES_PRO {
+                out.push_str(&format!("{}\n", e.message));
+            } else {
+                out.push_str(&format!("styky: {}\n", e.message));
+            }
             if e.code == "invalid_usage" {
                 out.push_str("Try `styky --help`.\n");
             }
             match e.code.as_str() {
-                "requires_pro" => 3,
+                proto::REQUIRES_PRO => 3,
                 "not_running" => 2,
                 _ => 1,
             }
@@ -370,9 +377,9 @@ mod tests {
 
     #[test]
     fn errors_have_exit_codes_and_clear_text() {
-        let (code, out, _) = exec_with(&["done", "a1b2"], |_, _| Err(ApiError::new("requires_pro", "'complete' requires Styky Pro.")));
+        let (code, out, _) = exec_with(&["edit", "a1b2", "--repeat", "FREQ=DAILY;INTERVAL=2"], |_, _| Err(ApiError::requires_pro("Advanced repeats")));
         assert_eq!(code, 3);
-        assert!(out.contains("requires Styky Pro"), "{out}");
+        assert_eq!(out, "Advanced repeats is a Styky Pro feature: https://styky.smallhingelabs.com/pro\n");
         let (code, out, _) = exec_with(&["ls"], |_, _| Err(ApiError::new("not_running", proto::NOT_RUNNING)));
         assert_eq!(code, 2);
         assert!(out.contains("isn't running"));

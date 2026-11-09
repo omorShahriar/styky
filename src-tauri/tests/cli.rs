@@ -51,7 +51,7 @@ fn stderr(o: &Output) -> String {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn free_tier_add_and_ls_work_and_the_rest_is_gated() {
+async fn free_tier_runs_every_command_and_refuses_only_the_pro_feature() {
     let h = harness("free", false).await;
     let u = h.user.clone();
     tokio::task::spawn_blocking(move || {
@@ -68,11 +68,28 @@ async fn free_tier_add_and_ls_work_and_the_rest_is_gated() {
         let o = cli(&u, &["ls", "--tag", "nope"]);
         assert_eq!(stdout(&o), "Nothing here.\n");
 
-        for args in [vec!["done", &id], vec!["snooze", &id, "1h"], vec!["rm", &id], vec!["get", &id]] {
-            let o = cli(&u, &args);
-            assert_eq!(o.status.code(), Some(3), "{args:?}");
-            assert!(stderr(&o).contains("requires Styky Pro"), "{}", stderr(&o));
-        }
+        // Every command works on Free.
+        let o = cli(&u, &["get", &id]);
+        assert!(o.status.success() && stdout(&o).contains("Release v2.3"), "{}", stderr(&o));
+        let o = cli(&u, &["snooze", &id, "3h"]);
+        assert!(o.status.success(), "{}", stderr(&o));
+        let o = cli(&u, &["edit", &id, "--title", "Release v2.4", "--priority", "urgent", "--repeat", "weekly"]);
+        assert!(o.status.success(), "{}", stderr(&o));
+        let o = cli(&u, &["get", &id, "--json"]);
+        let v: Value = serde_json::from_str(&stdout(&o)).unwrap();
+        assert_eq!((v["priority"].as_str(), v["repeat"].as_str()), (Some("urgent"), Some("weekly")));
+
+        // A Pro feature is refused on its own: exit 3, one sentence on stderr, nothing changed.
+        let o = cli(&u, &["edit", &id, "--title", "should not stick", "--repeat", "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO"]);
+        assert_eq!(o.status.code(), Some(3));
+        assert_eq!(stderr(&o), "Advanced repeats is a Styky Pro feature: https://styky.smallhingelabs.com/pro\n");
+        assert_eq!(stdout(&o), "");
+        assert!(stdout(&cli(&u, &["get", &id])).contains("Release v2.4"));
+
+        let o = cli(&u, &["done", &id]);
+        assert!(o.status.success(), "{}", stderr(&o)); // weekly with no due time: completes
+        let o = cli(&u, &["rm", &id]);
+        assert!(o.status.success(), "{}", stderr(&o));
     })
     .await
     .unwrap();
@@ -139,9 +156,21 @@ async fn mcp_server_speaks_stdio_end_to_end() {
         assert_eq!(add["result"]["structuredContent"]["tag"], "infra");
         let list = rpc(json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"styky_list","arguments":{"tag":"infra"}}}));
         assert_eq!(list["result"]["structuredContent"]["items"].as_array().unwrap().len(), 1);
-        let gated = rpc(json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"styky_delete","arguments":{"id":"abcd"}}}));
+        // The former Pro tools work on Free.
+        let id = add["result"]["structuredContent"]["shortId"].as_str().unwrap().to_string();
+        let get = rpc(json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"styky_get","arguments":{"id": id}}}));
+        assert_eq!(get["result"]["isError"], false, "{get}");
+        let upd = rpc(json!({"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"styky_update","arguments":{"id": id, "priority": "urgent"}}}));
+        assert_eq!((upd["result"]["isError"].clone(), upd["result"]["structuredContent"]["priority"].clone()), (json!(false), json!("urgent")), "{upd}");
+        // A Pro feature is refused on its own, with a machine-readable code.
+        let gated = rpc(json!({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"styky_update","arguments":{"id": id, "repeat": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO"}}}));
         assert_eq!(gated["result"]["isError"], true);
-        assert!(gated["result"]["content"][0]["text"].as_str().unwrap().contains("requires Styky Pro"));
+        assert_eq!(gated["result"]["structuredContent"]["code"], "requires_pro");
+        assert_eq!(gated["result"]["structuredContent"]["feature"], "Advanced repeats");
+        assert_eq!(gated["result"]["structuredContent"]["url"], "https://styky.smallhingelabs.com/pro");
+        assert_eq!(gated["result"]["content"][0]["text"], "Advanced repeats is a Styky Pro feature: https://styky.smallhingelabs.com/pro");
+        let del = rpc(json!({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"styky_delete","arguments":{"id": id}}}));
+        assert_eq!(del["result"]["isError"], false, "{del}");
         drop(stdin);
         let _ = child.wait();
     })

@@ -15,17 +15,18 @@ use crate::CallFn;
 const SUPPORTED: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 const INSTRUCTIONS: &str = "Styky is a Windows desktop reminder widget. Use these tools to add, list and manage the user's reminders. \
-Times are interpreted in the user's local time zone. add and list are free; complete, snooze, update, delete and get need Styky Pro \
-(if a tool answers 'requires Styky Pro', tell the user instead of retrying). Reminder ids are the 8-character shortId from list/add.";
+Times are interpreted in the user's local time zone. Every tool is free. A few features need Styky Pro (for example advanced repeats \
+such as \"every 2 weeks\"); a request that uses one is refused with the error code requires_pro, naming the feature and a link. \
+Tell the user instead of retrying, and offer the same reminder without that feature. Reminder ids are the 8-character shortId from list/add.";
 
 pub fn tools() -> Value {
     let id = json!({"type": "string", "description": "Reminder id: the 8-character shortId from list/add (any unique prefix of the full id works)."});
     let when = "Natural language (\"tomorrow 5pm\", \"fri 10am\"), a short duration (\"30m\", \"2h\", \"1d\") or an ISO date-time (\"2026-03-12 17:00\", local time, or RFC 3339).";
-    let priority = json!({"type": "string", "enum": ["low", "normal", "urgent", "critical"], "description": "critical reminders keep re-notifying until handled (Styky Pro)."});
+    let priority = json!({"type": "string", "enum": ["low", "normal", "urgent", "critical"], "description": "critical marks the reminder as most important."});
     json!([
         {
             "name": "styky_add",
-            "description": "Add a reminder to Styky. Pass either `text` (a natural-language line such as \"Release v2.3 fri 5pm #api !!\": dates/times, #tag, @branch, URLs, !! urgent, `every day|weekday|week|month` are parsed) or explicit fields. Explicit fields override what the text says. Free.",
+            "description": "Add a reminder to Styky. Pass either `text` (a natural-language line such as \"Release v2.3 fri 5pm #api !!\": dates/times, #tag, @branch, URLs, !! urgent, `every day|weekday|week|month` are parsed) or explicit fields. Explicit fields override what the text says. Repeats in text or in `repeat` are limited to daily, weekdays, weekly and monthly; anything else (\"every 2 weeks\") is a Styky Pro feature.",
             "inputSchema": {"type": "object", "properties": {
                 "text": {"type": "string", "description": "Natural-language reminder, e.g. \"rotate the keys friday 10am #infra !!\"."},
                 "title": {"type": "string", "description": "Reminder title (overrides the title parsed from text)."},
@@ -41,7 +42,7 @@ pub fn tools() -> Value {
         },
         {
             "name": "styky_list",
-            "description": "List the user's reminders, soonest first. Filter by due date, tag and status. Returns id, shortId, title, due (ISO 8601 local), priority, tag, status and whether it is overdue. Free.",
+            "description": "List the user's reminders, soonest first. Filter by due date, tag and status. Returns id, shortId, title, due (ISO 8601 local), priority, tag, status and whether it is overdue. Notes are left out; use styky_get for them.",
             "inputSchema": {"type": "object", "properties": {
                 "due": {"type": "string", "enum": ["today", "overdue", "any"], "description": "today = due today; overdue = past its due/snooze time and still open."},
                 "tag": {"type": "string", "description": "Only reminders with this tag."},
@@ -52,25 +53,25 @@ pub fn tools() -> Value {
         },
         {
             "name": "styky_get",
-            "description": "Get one reminder with all its fields, including notes. Requires Styky Pro.",
+            "description": "Get one reminder with all its fields, including notes.",
             "inputSchema": {"type": "object", "properties": {"id": id}, "required": ["id"]},
             "annotations": {"title": "Get a reminder", "readOnlyHint": true, "openWorldHint": false}
         },
         {
             "name": "styky_complete",
-            "description": "Mark a reminder done. A repeating reminder rolls forward to its next occurrence instead. Requires Styky Pro.",
+            "description": "Mark a reminder done. A repeating reminder rolls forward to its next occurrence instead.",
             "inputSchema": {"type": "object", "properties": {"id": id}, "required": ["id"]},
             "annotations": {"title": "Complete a reminder", "readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false}
         },
         {
             "name": "styky_snooze",
-            "description": "Snooze a reminder: it will notify again at the given time. Requires Styky Pro.",
+            "description": "Snooze a reminder: it will notify again at the given time.",
             "inputSchema": {"type": "object", "properties": {"id": id, "until": {"type": "string", "description": format!("When to remind again. {when}")}}, "required": ["id", "until"]},
             "annotations": {"title": "Snooze a reminder", "readOnlyHint": false, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false}
         },
         {
             "name": "styky_update",
-            "description": "Change fields of a reminder. Only the fields you pass change; pass due: null (or \"\") to clear the due time and tag: null to clear the tag. Requires Styky Pro.",
+            "description": "Change fields of a reminder. Only the fields you pass change; pass due: null (or \"\") to clear the due time and tag: null to clear the tag.",
             "inputSchema": {"type": "object", "properties": {
                 "id": id,
                 "title": {"type": "string"},
@@ -86,7 +87,7 @@ pub fn tools() -> Value {
         },
         {
             "name": "styky_delete",
-            "description": "Permanently delete a reminder. Prefer styky_complete unless the user asked to delete. Requires Styky Pro.",
+            "description": "Permanently delete a reminder. Prefer styky_complete unless the user asked to delete.",
             "inputSchema": {"type": "object", "properties": {"id": id}, "required": ["id"]},
             "annotations": {"title": "Delete a reminder", "readOnlyHint": false, "destructiveHint": true, "idempotentHint": true, "openWorldHint": false}
         }
@@ -168,8 +169,18 @@ fn handle_one(msg: &Value, call: CallFn) -> Option<Value> {
                     "structuredContent": if v.is_object() { v } else { json!({"result": v}) },
                     "isError": false
                 }),
-                // API errors (including "requires Styky Pro" and "Styky isn't running") are tool errors the model can read.
-                Err(e) => json!({"content": [{"type": "text", "text": e.message}], "isError": true}),
+                // API errors (including `requires_pro` and "Styky isn't running") are tool errors the model can read.
+                // `structuredContent` carries the machine-readable part: {code, ...data}; for requires_pro that is
+                // {code: "requires_pro", feature, url}.
+                Err(e) => {
+                    let mut sc = json!({"code": e.code});
+                    if let Some(d) = e.data.as_ref().and_then(Value::as_object) {
+                        for (k, v) in d {
+                            sc[k] = v.clone();
+                        }
+                    }
+                    json!({"content": [{"type": "text", "text": e.message}], "structuredContent": sc, "isError": true})
+                }
             }))
         }
         m if m.starts_with("notifications/") => None,
@@ -238,10 +249,9 @@ mod tests {
             assert!(t["description"].as_str().unwrap().len() > 30);
             assert!(method_of(t["name"].as_str().unwrap()).is_some());
         }
-        // Pro tools say so, free ones say free.
-        for pro in ["styky_get", "styky_complete", "styky_snooze", "styky_update", "styky_delete"] {
-            let d = tools.iter().find(|t| t["name"] == pro).unwrap()["description"].as_str().unwrap();
-            assert!(d.contains("Requires Styky Pro"), "{pro}");
+        // No tool is a Pro tool.
+        for t in tools {
+            assert!(!t["description"].as_str().unwrap().contains("Requires Styky Pro"), "{t}");
         }
     }
 
@@ -264,12 +274,26 @@ mod tests {
     #[test]
     fn api_errors_become_tool_errors_the_model_can_read() {
         let r = ask(
-            json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"styky_complete","arguments":{"id":"a1"}}}),
-            |_, _| Err(ApiError::new("requires_pro", "'complete' requires Styky Pro.")),
+            json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"styky_update","arguments":{"id":"a1","repeat":"FREQ=DAILY;INTERVAL=2"}}}),
+            |_, _| Err(ApiError::requires_pro("Advanced repeats")),
         )
         .unwrap();
         assert_eq!(r["result"]["isError"], true);
-        assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("requires Styky Pro"));
+        assert_eq!(
+            r["result"]["content"][0]["text"],
+            "Advanced repeats is a Styky Pro feature: https://styky.smallhingelabs.com/pro"
+        );
+        assert_eq!(
+            r["result"]["structuredContent"],
+            json!({"code": "requires_pro", "feature": "Advanced repeats", "url": "https://styky.smallhingelabs.com/pro"})
+        );
+        // Other errors carry their code too.
+        let r = ask(
+            json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"styky_get","arguments":{"id":"zz"}}}),
+            |_, _| Err(ApiError::new("not_found", "no reminder with id 'zz'")),
+        )
+        .unwrap();
+        assert_eq!((r["result"]["isError"].clone(), r["result"]["structuredContent"].clone()), (json!(true), json!({"code": "not_found"})));
         let r = ask(json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"zzz"}}), |_, _| unreachable!()).unwrap();
         assert_eq!(r["error"]["code"], -32602);
     }

@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "./api";
 
+/** Where Pro is explained. Every "Pro" label and "Get Pro" link in the app goes here. */
+export const PRO_URL = "https://styky.smallhingelabs.com/pro";
+
 export interface LicenseStatus {
   pro: boolean;
   /** none | active | grace-expired | dev */

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { api } from "../lib/api";
-import { usePro } from "../lib/pro";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { PRO_URL, usePro } from "../lib/pro";
 import { DAY_CODES, DAY_NAMES, type Freq, type Rule, describeRepeat, fromUntil, isSimpleRepeat, newRule, parseRule, storeRule, toUntil } from "../lib/rrule";
 import { ProPill } from "./ProPill";
 
@@ -59,7 +59,7 @@ export function RepeatField({ value, dueAt, onChange }: Props) {
   const onSelect = (v: string) => {
     if (v === "custom") {
       if (!pro) {
-        void api.openSettingsPro();
+        void openUrl(PRO_URL).catch(() => {});
         return;
       }
       setOpen(true);

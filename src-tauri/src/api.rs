@@ -1,7 +1,8 @@
 //! Local API: JSON-RPC style methods over the per-user named pipe (see `proto.rs`).
 //!
-//! Free: `add`, `list`.  Pro: `get`, `complete`, `snooze`, `update`, `delete`
-//! (a free build answers them with the `requires_pro` error). The handlers are plain functions over
+//! Every method is free (`add`, `list`, `get`, `complete`, `snooze`, `update`, `delete`). A request that asks for a
+//! Pro *feature* (advanced repeats, early warnings) is refused on its own with the `requires_pro` error, which names
+//! the feature and links the /pro page; the rest of the method still works. The handlers are plain functions over
 //! `Db` so they are unit-tested without a pipe; `serve` is the transport.
 
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
@@ -11,6 +12,8 @@ use crate::db::Db;
 use crate::model::{Item, ItemEdit, gate_edit};
 use crate::nlp;
 use crate::proto::{ApiError, err_response, ok_response};
+#[cfg(test)]
+use crate::proto::REQUIRES_PRO;
 
 pub struct Ctx<'a> {
     pub db: &'a Db,
@@ -33,13 +36,18 @@ impl ApiStatus {
     }
 }
 
-pub const REQUIRES_PRO: &str = "requires_pro";
+/// Feature names used in `requires_pro` errors (the sentence is "<name> is a Styky Pro feature: <url>").
+pub const FEATURE_ADVANCED_REPEATS: &str = "Advanced repeats";
+pub const FEATURE_EARLY_WARNINGS: &str = "Early warnings";
 
-fn requires_pro(method: &str) -> ApiError {
-    ApiError::new(
-        REQUIRES_PRO,
-        format!("'{method}' requires Styky Pro. Unlock it in Styky → Settings → Styky Pro. (add and list are always free.)"),
-    )
+/// The one place that decides whether a repeat is Pro: anything outside none / daily / weekdays / weekly / monthly.
+/// (Same rule as the UI's free options; see `repeat::is_simple`.)
+pub fn repeat_is_advanced(repeat: &str) -> bool {
+    !crate::repeat::is_simple(repeat)
+}
+
+fn requires_pro(feature: &str) -> ApiError {
+    ApiError::requires_pro(feature)
 }
 
 fn bad(msg: impl Into<String>) -> ApiError {
@@ -69,7 +77,6 @@ fn dispatch(ctx: &Ctx, method: &str, p: &Value) -> Out {
     match method {
         "add" => add(ctx, p),
         "list" => list(ctx, p),
-        "get" | "complete" | "snooze" | "update" | "delete" if !ctx.pro => Err(requires_pro(method)),
         "get" => {
             let item = find(ctx, p)?;
             Ok((view(&item, ctx.now), false))
@@ -121,7 +128,11 @@ fn add(ctx: &Ctx, p: &Value) -> Out {
         q.priority = parse_priority(v)?;
     }
     if let Some(v) = str_field(p, "repeat") {
-        q.repeat = parse_repeat(v, ctx.pro)?;
+        q.repeat = parse_repeat(v)?;
+    }
+    // Also covers a repeat that came from the sentence ("... every 2 weeks").
+    if !ctx.pro && repeat_is_advanced(&q.repeat) {
+        return Err(requires_pro(FEATURE_ADVANCED_REPEATS));
     }
     if q.title.trim().is_empty() {
         return Err(bad("a title is required (pass \"text\" or \"title\")"));
@@ -130,8 +141,11 @@ fn add(ctx: &Ctx, p: &Value) -> Out {
         Some(v) => parse_prealert(v)?,
         None => None,
     };
-    if !ctx.pro && (prealert.is_some() || q.priority >= 3 && p.get("priority").is_some()) {
-        return Err(requires_pro("pre-alerts and Critical priority"));
+    if !ctx.pro && prealert.is_some() {
+        return Err(requires_pro(FEATURE_EARLY_WARNINGS));
+    }
+    if !ctx.pro && q.priority >= 3 && p.get("priority").is_some() {
+        return Err(requires_pro("Critical priority")); // removed in B2
     }
     let mut edit = ItemEdit {
         title: q.title,
@@ -176,8 +190,8 @@ fn list(ctx: &Ctx, p: &Value) -> Out {
         .take(limit)
         .map(|i| {
             let mut v = view(&i, ctx.now);
-            // Notes are what the Pro-only `get` is for: a free `list` must not leak them.
-            if !ctx.pro && let Some(o) = v.as_object_mut() {
+            // `list` stays compact for agents; `get` returns the notes.
+            if let Some(o) = v.as_object_mut() {
                 o.remove("notes");
             }
             v
@@ -212,6 +226,9 @@ fn update(ctx: &Ctx, p: &Value) -> Out {
     };
     if let Some(v) = p.get("prealert") {
         e.prealert_min = parse_prealert(v)?;
+        if !ctx.pro && e.prealert_min.is_some() {
+            return Err(requires_pro(FEATURE_EARLY_WARNINGS));
+        }
     }
     if let Some(v) = str_field(p, "title") {
         e.title = v.to_string();
@@ -234,7 +251,11 @@ fn update(ctx: &Ctx, p: &Value) -> Out {
         e.priority = parse_priority(v)?;
     }
     if let Some(v) = str_field(p, "repeat") {
-        e.repeat = parse_repeat(v, ctx.pro)?;
+        e.repeat = parse_repeat(v)?;
+        // A Pro repeat the item already has may be sent back unchanged; asking for a new one needs Pro.
+        if !ctx.pro && repeat_is_advanced(&e.repeat) && e.repeat != item.repeat {
+            return Err(requires_pro(FEATURE_ADVANCED_REPEATS));
+        }
     }
     if e.title.trim().is_empty() {
         return Err(bad("title cannot be empty"));
@@ -301,7 +322,7 @@ fn parse_prealert(v: &Value) -> Result<Option<i64>, ApiError> {
         .ok_or_else(|| bad("prealert must be one of 5m, 15m, 30m, 1h, 1d (or null)"))
 }
 
-fn parse_repeat(s: &str, pro: bool) -> Result<String, ApiError> {
+fn parse_repeat(s: &str) -> Result<String, ApiError> {
     let r = match s.to_lowercase().as_str() {
         "" | "none" => "none".to_string(),
         "daily" | "day" => "daily".into(),
@@ -314,9 +335,6 @@ fn parse_repeat(s: &str, pro: bool) -> Result<String, ApiError> {
                 return Err(bad(format!(
                     "repeat '{s}' is not none, daily, weekdays, weekly, monthly or an RRULE like FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=6"
                 )));
-            }
-            if !pro {
-                return Err(requires_pro("advanced repeats"));
             }
             n
         }
@@ -678,7 +696,11 @@ mod tests {
         let v: Value = serde_json::from_str(&out).unwrap();
         assert_eq!(v["id"], 7);
         match v.get("error") {
-            Some(e) => Err(ApiError::new(e["code"].as_str().unwrap(), e["message"].as_str().unwrap())),
+            Some(e) => {
+                let mut err = ApiError::new(e["code"].as_str().unwrap(), e["message"].as_str().unwrap());
+                err.data = e.get("data").cloned();
+                Err(err)
+            }
             None => Ok(v["result"].clone()),
         }
     }
@@ -725,17 +747,17 @@ mod tests {
     }
 
     #[test]
-    fn free_list_hides_notes_but_pro_list_and_get_show_them() {
+    fn list_is_compact_and_get_returns_the_notes_on_every_tier() {
         let db = Db::open_memory().unwrap();
         let r = run(&db, false, "add", json!({"title": "n", "notes": "secret body"})).unwrap();
-        let free = run(&db, false, "list", json!({})).unwrap();
-        assert!(free["items"][0].get("notes").is_none());
-        assert_eq!(free["items"][0]["title"], "n");
+        for pro in [false, true] {
+            let l = run(&db, pro, "list", json!({})).unwrap();
+            assert!(l["items"][0].get("notes").is_none(), "pro={pro}");
+            assert_eq!(l["items"][0]["title"], "n");
+            assert_eq!(run(&db, pro, "get", json!({"id": r["id"]})).unwrap()["notes"], "secret body", "pro={pro}");
+        }
         // add's own response is the caller's input echoed back; it may keep notes.
         assert_eq!(r["notes"], "secret body");
-        let pro = run(&db, true, "list", json!({})).unwrap();
-        assert_eq!(pro["items"][0]["notes"], "secret body");
-        assert_eq!(run(&db, true, "get", json!({"id": r["id"]})).unwrap()["notes"], "secret body");
     }
 
     #[test]
@@ -795,49 +817,68 @@ mod tests {
     }
 
     #[test]
-    fn pro_methods_are_gated_with_a_clear_error() {
-        let db = Db::open_memory().unwrap();
-        let id = add(&db, "task")["id"].as_str().unwrap().to_string();
-        for (m, p) in [
-            ("get", json!({"id": id})),
-            ("complete", json!({"id": id})),
-            ("snooze", json!({"id": id, "until": "1h"})),
-            ("update", json!({"id": id, "title": "x"})),
-            ("delete", json!({"id": id})),
-        ] {
-            let e = run(&db, false, m, p).unwrap_err();
-            assert_eq!(e.code, REQUIRES_PRO, "{m}");
-            assert!(e.message.contains("requires Styky Pro") && e.message.contains(m), "{}", e.message);
-        }
-        // Nothing happened.
-        assert_eq!(db.list(NOW).unwrap().len(), 1);
-    }
-
-    #[test]
-    fn pro_methods_work_with_a_short_id() {
+    fn every_method_works_on_free_with_a_short_id() {
         let db = Db::open_memory().unwrap();
         let r = add(&db, "task #t");
         let id = r["id"].as_str().unwrap();
         let short = &id[..8];
-        assert_eq!(run(&db, true, "get", json!({"id": short})).unwrap()["title"], "task");
-        let s = run(&db, true, "snooze", json!({"id": short, "until": "1h"})).unwrap();
+        assert_eq!(run(&db, false, "get", json!({"id": short})).unwrap()["title"], "task");
+        let s = run(&db, false, "snooze", json!({"id": short, "until": "1h"})).unwrap();
         assert!(s["snoozedUntil"].as_str().is_some());
         assert_eq!(db.list(NOW).unwrap()[0].snoozed_until, Some(NOW + 3_600_000));
-        assert!(run(&db, true, "snooze", json!({"id": short, "until": "garbage"})).is_err());
-        let u = run(&db, true, "update", json!({"id": short, "title": "task 2", "tag": null, "priority": "low"})).unwrap();
+        assert!(run(&db, false, "snooze", json!({"id": short, "until": "garbage"})).is_err());
+        let u = run(&db, false, "update", json!({"id": short, "title": "task 2", "tag": null, "priority": "low"})).unwrap();
         assert_eq!((u["title"].as_str(), u["tag"].is_null(), u["priority"].as_str()), (Some("task 2"), true, Some("low")));
-        let c = run(&db, true, "complete", json!({"id": short})).unwrap();
+        let c = run(&db, false, "complete", json!({"id": short})).unwrap();
         assert_eq!(c["status"], "done");
-        assert_eq!(run(&db, true, "list", json!({"status": "done"})).unwrap()["items"].as_array().unwrap().len(), 1);
-        run(&db, true, "delete", json!({"id": short})).unwrap();
-        assert_eq!(run(&db, true, "get", json!({"id": short})).unwrap_err().code, "not_found");
+        assert_eq!(run(&db, false, "list", json!({"status": "done"})).unwrap()["items"].as_array().unwrap().len(), 1);
+        run(&db, false, "delete", json!({"id": short})).unwrap();
+        assert_eq!(run(&db, false, "get", json!({"id": short})).unwrap_err().code, "not_found");
+    }
+
+    #[test]
+    fn a_pro_feature_is_refused_on_its_own_with_the_feature_name_and_the_pro_url() {
+        let db = Db::open_memory().unwrap();
+        // Advanced repeats: by field and by sentence.
+        for p in [json!({"title": "x", "repeat": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO"}), json!({"text": "standup every 2 weeks"})] {
+            let e = run(&db, false, "add", p).unwrap_err();
+            assert_eq!(e.code, REQUIRES_PRO);
+            assert_eq!(e.message, "Advanced repeats is a Styky Pro feature: https://styky.smallhingelabs.com/pro");
+            assert_eq!(e.data, Some(json!({"feature": "Advanced repeats", "url": "https://styky.smallhingelabs.com/pro"})));
+        }
+        // ...and on update, where the refused request changes nothing.
+        let id = add(&db, "task")["id"].as_str().unwrap().to_string();
+        let e = run(&db, false, "update", json!({"id": id, "title": "renamed", "repeat": "FREQ=MONTHLY;INTERVAL=3"})).unwrap_err();
+        assert_eq!(e.code, REQUIRES_PRO);
+        assert_eq!(db.list(NOW).unwrap().iter().map(|i| i.title.as_str()).collect::<Vec<_>>(), ["task"]);
+        // The same update without the Pro field works.
+        let ok = run(&db, false, "update", json!({"id": id, "title": "renamed", "due": "2030-01-02 09:00", "repeat": "weekly"})).unwrap();
+        assert_eq!((ok["title"].as_str(), ok["repeat"].as_str()), (Some("renamed"), Some("weekly")));
+        // Pro: the advanced repeat works.
+        assert!(run(&db, true, "add", json!({"title": "x", "repeat": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO"})).is_ok());
+        // The boundary is one function.
+        for r in ["none", "", "daily", "weekdays", "weekly", "monthly"] {
+            assert!(!repeat_is_advanced(r), "{r}");
+        }
+        for r in ["FREQ=DAILY", "FREQ=WEEKLY;INTERVAL=2", "weekend"] {
+            assert!(repeat_is_advanced(r), "{r}");
+        }
+    }
+
+    #[test]
+    fn a_free_install_may_send_back_a_pro_repeat_the_item_already_has() {
+        let db = Db::open_memory().unwrap();
+        let r = run(&db, true, "add", json!({"title": "x", "due": "2030-01-02 09:00", "repeat": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO"})).unwrap();
+        let same = r["repeat"].as_str().unwrap().to_string();
+        let u = run(&db, false, "update", json!({"id": r["id"], "title": "y", "repeat": same})).unwrap();
+        assert_eq!((u["title"].as_str(), u["repeat"].as_str()), (Some("y"), Some(same.as_str())));
     }
 
     #[test]
     fn complete_rolls_a_repeating_item_forward() {
         let db = Db::open_memory().unwrap();
         let r = run(&db, false, "add", json!({"title": "daily", "due": "2030-01-02 09:00", "repeat": "daily"})).unwrap();
-        let c = run(&db, true, "complete", json!({"id": r["id"]})).unwrap();
+        let c = run(&db, false, "complete", json!({"id": r["id"]})).unwrap();
         assert_eq!(c["status"], "open");
         assert!(c["due"].as_str().unwrap().starts_with("2030-01-03T09:00"));
     }

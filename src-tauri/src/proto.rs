@@ -8,6 +8,12 @@ use serde_json::{Value, json};
 
 pub const NOT_RUNNING: &str = "Styky isn't running. Start it from the Start menu, then try again.";
 
+/// Where a Pro feature is explained. Every `requires_pro` message ends with it.
+pub const PRO_URL: &str = "https://styky.smallhingelabs.com/pro";
+
+/// Machine-readable error code for "this request uses a Pro feature".
+pub const REQUIRES_PRO: &str = "requires_pro";
+
 /// `\\.\pipe\styky-<username>`: one pipe per Windows user.
 pub fn pipe_name() -> String {
     let user = std::env::var("USERNAME").unwrap_or_else(|_| "user".into());
@@ -19,11 +25,20 @@ pub fn pipe_name() -> String {
 pub struct ApiError {
     pub code: String,
     pub message: String,
+    /// Extra machine-readable detail (for `requires_pro`: `{"feature": "...", "url": "..."}`).
+    pub data: Option<Value>,
 }
 
 impl ApiError {
     pub fn new(code: &str, message: impl Into<String>) -> Self {
-        Self { code: code.into(), message: message.into() }
+        Self { code: code.into(), message: message.into(), data: None }
+    }
+
+    /// A request used a Pro feature on a Free install. Only that request is refused, never a whole tool or command.
+    pub fn requires_pro(feature: &str) -> Self {
+        let mut e = Self::new(REQUIRES_PRO, format!("{feature} is a Styky Pro feature: {PRO_URL}"));
+        e.data = Some(json!({ "feature": feature, "url": PRO_URL }));
+        e
     }
 }
 
@@ -40,7 +55,11 @@ pub fn ok_response(id: &Value, result: Value) -> String {
 
 #[allow(dead_code)]
 pub fn err_response(id: &Value, e: &ApiError) -> String {
-    json!({ "id": id, "error": { "code": e.code, "message": e.message } }).to_string()
+    let mut error = json!({ "code": e.code, "message": e.message });
+    if let Some(d) = &e.data {
+        error["data"] = d.clone();
+    }
+    json!({ "id": id, "error": error }).to_string()
 }
 
 /// Send one request over the pipe `name` and wait for the answer.
@@ -77,10 +96,11 @@ pub fn call_on(name: &str, method: &str, params: Value) -> Result<Value, ApiErro
     BufReader::new(&pipe).read_line(&mut line).map_err(io)?;
     let v: Value = serde_json::from_str(&line).map_err(|e| ApiError::new("protocol", format!("bad reply from Styky: {e}")))?;
     match v.get("error") {
-        Some(e) if !e.is_null() => Err(ApiError::new(
-            e["code"].as_str().unwrap_or("error"),
-            e["message"].as_str().unwrap_or("unknown error"),
-        )),
+        Some(e) if !e.is_null() => {
+            let mut err = ApiError::new(e["code"].as_str().unwrap_or("error"), e["message"].as_str().unwrap_or("unknown error"));
+            err.data = e.get("data").filter(|d| !d.is_null()).cloned();
+            Err(err)
+        }
         _ => Ok(v.get("result").cloned().unwrap_or(Value::Null)),
     }
 }
