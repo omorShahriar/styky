@@ -159,6 +159,12 @@ Items are camelCase JSON, times unix ms UTC. Settings: `autoclear_days` (7), `qu
 - DB `%APPDATA%\com.styky.app\styky.db`; window state `.window-state.json` next to it. Test items you create in dev land in the real dev DB; delete them.
 
 **Gotchas**
+- **Never install or run the NSIS build from inside a Claude desktop app session.** The Claude desktop app is MSIX-packaged, so
+  processes it spawns get its file/registry virtualization. An installer run from there writes into
+  `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\...` instead of `%LOCALAPPDATA%\Styky`. The Start menu shortcut then points into
+  Claude's sandbox (generic icon), and the install and autostart results are not what a real user gets. To test an install, have the owner
+  double-click the setup.exe in File Explorer, or hand it to the real shell with `explorer.exe <path-to-setup.exe>`, which runs
+  outside the container. `tauri dev` and `cargo test` are unaffected.
 - **Z-order (`desktop.rs`)**: never `HWND_BOTTOM`/`set_always_on_bottom`. The 200 ms watcher makes the panel TOPMOST while no ordinary app window is visible. Any of our own topmost windows must call
   `desktop::suspend(true/false)` (quick-add does; Settings must too).
 - **Toasts** are hand-built XML (see M3 notes); AUMID is `com.styky.app` in release builds only. Verify a toast from the *installed* build in M4.
