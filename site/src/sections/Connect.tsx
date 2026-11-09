@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { config, proVersion, versionAtLeast } from "../config";
-import { Reveal, SectionHead, useRelease } from "./util";
+import { release } from "../release";
+import { Reveal, SectionHead } from "./util";
 
 type Tier = "free" | "pro";
 
@@ -49,8 +50,7 @@ styky add "Check CI in 15m #ci @$branch" || true
 exit 0`;
 
 export function Connect() {
-  const { version } = useRelease();
-  const shipped = versionAtLeast(version, proVersion);
+  const shipped = versionAtLeast(release.version, proVersion);
   const short = proVersion.replace(/\.0$/, "");
   return (
     <section className="x-section alt" id="connect">

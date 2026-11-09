@@ -11,7 +11,7 @@ import {
   Rocket,
   Zap,
 } from "lucide-react";
-import { config } from "../config";
+import { config, NETWORK_STATEMENT } from "../config";
 import { Reveal, SectionHead } from "./util";
 
 export function Problem() {
@@ -174,8 +174,7 @@ export function Privacy() {
             <p className="x-eyebrow">Privacy &amp; local-first</p>
             <h2 className="x-h2">Your reminders never leave your PC.</h2>
             <p className="x-lead">
-              Styky works fully offline. The free app contacts GitHub only when you click &ldquo;Check for
-              updates&rdquo; in Settings, and no personal data is sent.
+              Styky works fully offline. {NETWORK_STATEMENT}
             </p>
           </Reveal>
           <Reveal delay={80}>
@@ -201,7 +200,7 @@ export function Privacy() {
             <br />
             <span className="x-pill">All of it, on your disk</span>
             <p style={{ marginTop: 18, fontFamily: "var(--font)", fontSize: 14, color: "var(--label-2)" }}>
-              Read the full <a href={config.privacyUrl}>privacy policy</a>. It is short.
+              Read the full <a href={`${import.meta.env.BASE_URL}privacy`}>privacy policy</a>. It is short.
             </p>
           </div>
         </Reveal>

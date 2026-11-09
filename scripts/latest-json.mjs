@@ -1,6 +1,8 @@
-// Writes latest.json for the Tauri updater next to the NSIS installer.
+// Writes latest.json for the Tauri updater next to the NSIS installer, and an unversioned copy of the installer
+// (Styky_x64-setup.exe) so the website can link to .../releases/latest/download/Styky_x64-setup.exe forever.
+// Upload both installer names to every release; latest.json keeps pointing at the versioned one.
 // Usage: node scripts/latest-json.mjs <version> "<notes>"
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const [version, notes = ""] = process.argv.slice(2);
@@ -28,3 +30,12 @@ const manifest = {
 const out = join(dir, "latest.json");
 writeFileSync(out, JSON.stringify(manifest, null, 2) + "\n");
 console.log(`wrote ${out}`);
+
+// Unversioned copy for the static download link on the website.
+const stable = join(dir, "Styky_x64-setup.exe");
+if (!existsSync(join(dir, exe))) {
+  console.error(`missing ${join(dir, exe)}`);
+  process.exit(1);
+}
+copyFileSync(join(dir, exe), stable);
+console.log(`wrote ${stable} (copy of ${exe})`);

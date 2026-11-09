@@ -7,10 +7,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const appSrc = path.resolve(here, "../src");
 const mock = (file: string) => path.resolve(here, "src/mock", file);
 
-/** Public base path. "/" on Cloudflare Pages (styky.pages.dev or a custom domain); "/styky/" only for GitHub Pages. */
+/** Public base path. "/" on Cloudflare Pages (custom domain); "/styky/" only for GitHub Pages. */
 const base = process.env.SITE_BASE || "/";
 /** Absolute site URL, used for canonical / OG tags. */
-const siteUrl = (process.env.SITE_URL || "https://styky.pages.dev/").replace(/\/?$/, "/");
+const siteUrl = (process.env.SITE_URL || "https://styky.smallhingelabs.com/").replace(/\/?$/, "/");
 
 /** The app's real `src/lib/api.ts` (Tauri invoke wrappers) is swapped for the in-memory mock. */
 function mockApi(): Plugin {
@@ -33,12 +33,27 @@ function htmlVars(): Plugin {
   };
 }
 
+/** Clean URLs for the legal pages: Cloudflare Pages serves refund.html at /refund; mirror that in dev and preview. */
+const LEGAL = ["refund", "terms", "privacy"];
+function cleanLegalUrls(): Plugin {
+  const rewrite = (req: { url?: string }, _res: unknown, next: () => void) => {
+    const m = /^\/(refund|terms|privacy)\/?(\?.*)?$/.exec(req.url ?? "");
+    if (m && LEGAL.includes(m[1])) req.url = `/${m[1]}.html${m[2] ?? ""}`;
+    next();
+  };
+  return {
+    name: "styky-clean-legal-urls",
+    configureServer: (s) => void s.middlewares.use(rewrite),
+    configurePreviewServer: (s) => void s.middlewares.use(rewrite),
+  };
+}
+
 const exact = (name: string) => new RegExp(`^${name.replace(/[/@.-]/g, "\$&")}$`);
 
 // https://vite.dev/config/
 export default defineConfig({
   base,
-  plugins: [react(), mockApi(), htmlVars()],
+  plugins: [react(), mockApi(), htmlVars(), cleanLegalUrls()],
   resolve: {
     alias: [
       { find: exact("@tauri-apps/api/core"), replacement: mock("tauri-core.ts") },
@@ -66,5 +81,16 @@ export default defineConfig({
     ],
   },
   server: { fs: { allow: [path.resolve(here, "..")] } },
-  build: { target: "es2022", sourcemap: false },
+  build: {
+    target: "es2022",
+    sourcemap: false,
+    rollupOptions: {
+      input: {
+        main: path.resolve(here, "index.html"),
+        refund: path.resolve(here, "refund.html"),
+        terms: path.resolve(here, "terms.html"),
+        privacy: path.resolve(here, "privacy.html"),
+      },
+    },
+  },
 });

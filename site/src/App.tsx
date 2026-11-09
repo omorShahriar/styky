@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
-import { Footer, Hero, Nav } from "./sections/Chrome";
+import { Hero, Nav } from "./sections/Chrome";
+import { Footer } from "./sections/Shell";
 import { Connect } from "./sections/Connect";
 import { Faq, Features, KeyboardSection, Privacy, Problem } from "./sections/Content";
 import { Pricing } from "./sections/Pricing";

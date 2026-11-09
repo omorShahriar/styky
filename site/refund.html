@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Refund policy | Styky</title>
+    <meta name="description" content="Styky Pro comes with a 14-day, no-questions refund. How to ask, and who processes it." />
+    <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="__SITE_URL__refund" />
+    <link rel="icon" type="image/svg+xml" href="__BASE__favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Styky" />
+    <meta property="og:title" content="Refund policy | Styky" />
+    <meta property="og:description" content="Styky Pro comes with a 14-day, no-questions refund. How to ask, and who processes it." />
+    <meta property="og:url" content="__SITE_URL__refund" />
+    <meta property="og:image" content="__SITE_URL__og.png" />
+
+    <script>
+      /* Set the theme before first paint (no flash): saved choice, else the system preference. */
+      (function () {
+        var t;
+        try {
+          t = localStorage.getItem("styky-theme");
+        } catch (e) {}
+        if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = t;
+      })();
+    </script>
+  </head>
+  <body data-page="refund">
+    <div id="root"></div>
+    <noscript>
+      <p style="font:16px system-ui;padding:2rem;max-width:40rem;margin:auto">
+        Refund policy: see <a href="https://github.com/omorShahriar/styky">github.com/omorShahriar/styky</a> or write to
+        <a href="mailto:hello@smallhingelabs.com">hello@smallhingelabs.com</a>.
+      </p>
+    </noscript>
+    <script type="module" src="/src/legal.tsx"></script>
+  </body>
+</html>

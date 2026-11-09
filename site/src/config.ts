@@ -1,40 +1,42 @@
 /**
- * Site configuration. Edit this file (or set the VITE_* env vars at build time).
- * See site/README.md for how to wire up Lemon Squeezy and a custom domain.
+ * Site configuration. Edit this file; see site/README.md.
+ * Release facts (version, stars) are NOT here: they come from src/release.json, refreshed at build time
+ * (scripts/release-data.mjs). The browser never calls a GitHub API.
  */
-
-/** Marker value: while the checkout URL contains it, the Buy button shows "Coming soon". */
-export const CHECKOUT_PLACEHOLDER = "REPLACE_ME";
 
 export const config = {
   repo: "omorShahriar/styky",
   repoUrl: "https://github.com/omorShahriar/styky",
   releasesUrl: "https://github.com/omorShahriar/styky/releases/latest",
-  /** Installer asset of the current release. Refined at runtime from the GitHub API if the version moved on. */
-  downloadUrl: "https://github.com/omorShahriar/styky/releases/latest/download/Styky_0.1.0_x64-setup.exe",
-  version: "0.1.0",
+  /** Static URL: every release also uploads the installer under this unversioned name, so it never needs a redeploy. */
+  downloadUrl: "https://github.com/omorShahriar/styky/releases/latest/download/Styky_x64-setup.exe",
   licenseUrl: "https://github.com/omorShahriar/styky/blob/main/LICENSE",
-  privacyUrl: "https://github.com/omorShahriar/styky/blob/main/docs/PRIVACY.md",
-  issuesUrl: "https://github.com/omorShahriar/styky/issues",
   author: "Omor Shahriar",
   authorUrl: "https://github.com/omorShahriar",
-
-  /**
-   * Lemon Squeezy checkout URL for Styky Pro, e.g. "https://YOURSTORE.lemonsqueezy.com/buy/<uuid>".
-   * Leave the placeholder until the product exists; the Buy button then reads "Coming soon".
-   */
-  checkoutUrl:
-    (import.meta.env.VITE_LS_CHECKOUT_URL as string | undefined) ||
-    `https://YOURSTORE.lemonsqueezy.com/buy/${CHECKOUT_PLACEHOLDER}`,
-
-  /** Early-bird price, and the regular price after it (USD). */
-  priceEarly: 4.99,
-  priceRegular: 6.99,
+  publisher: "Small Hinge Labs",
+  contactEmail: "hello@smallhingelabs.com",
+  lemonBuyerTermsUrl: "https://www.lemonsqueezy.com/buyer-terms",
 } as const;
 
-export const checkoutReady = !config.checkoutUrl.includes(CHECKOUT_PLACEHOLDER);
+/**
+ * The one canonical network statement. Keep it byte-identical with docs/PRIVACY.md and the README.
+ * (Add the GitHub-watch clause here, and there, only when GitHub watch ships.)
+ */
+export const NETWORK_STATEMENT =
+  "No telemetry. Styky only goes online to check for updates and to activate or remove a Pro key when you click the button.";
 
-/** The release that introduced Pro, the CLI and the MCP server. */
+/** Shown next to the statement on the site. */
+export const ANALYTICS_SENTENCE = "This site counts visits with Cloudflare Web Analytics: no cookies, no personal data.";
+
+/** Pro teaser copy (exactly these four strings, nothing else, until the /pro page ships). */
+export const proTeaser = {
+  heading: "Styky Pro",
+  tagline: "Reminders that know when they're done.",
+  price: "$12 one-time · coming Nov 30",
+  line: "Styky is free. Pro is how it stays that way.",
+} as const;
+
+/** The release that introduced the CLI and the MCP server. */
 export const proVersion = "0.2.0";
 
 /** True when `version` ("0.2.1", "v0.3.0") is `min` or newer. Compares numeric parts only. */
@@ -45,4 +47,5 @@ export function versionAtLeast(version: string, min: string): boolean {
   return true;
 }
 
-export const money =(n: number) => `$${n.toFixed(2)}`;
+/** Date shown on the legal pages ("Last updated"). */
+export const legalUpdated = "November 9, 2026";

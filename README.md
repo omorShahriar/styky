@@ -21,7 +21,7 @@ claude mcp add styky -- styky mcp             # free: add + list; Pro: complete,
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078d4?logo=windows11&logoColor=white)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white)
 
-[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.pages.dev/readme) · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal) · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
+[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.smallhingelabs.com/readme) · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal) · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
 
 </div>
 
@@ -219,13 +219,12 @@ Merge @release/2.3 in 2h
 
 - Reminders are stored in `%APPDATA%\com.styky.app\styky.db` (SQLite) on your machine and nowhere else.
 - Settings → Data → **Export** creates a plain JSON backup, and **Import** can merge or replace. Exports never contain your Pro license key.
-- Styky only touches the network when you click **Check for updates** (it queries this repository's releases) or when you
-  activate or re-validate a Pro license key (Lemon Squeezy's license API; no personal data is sent).
+- No telemetry. Styky only goes online to check for updates and to activate or remove a Pro key when you click the button.
 
 ## Styky Pro
 
 Styky stays free and MIT-licensed, and nothing that was free becomes paid. **Styky Pro** is an optional one-time unlock
-(early-bird **$4.99**, then **$6.99**, no subscription, one key for about three of your own PCs):
+(**$12**, no subscription, coming Nov 30):
 
 - the rest of the CLI and MCP tools: `get`, `done`, `snooze`, `edit`, `rm`
 - **Critical** reminders that re-notify until you act, and pre-alerts (5 minutes to 1 day before)
@@ -233,7 +232,7 @@ Styky stays free and MIT-licensed, and nothing that was free becomes paid. **Sty
 - themes (tint, transparency, density, accent, paper skin, font size)
 
 It runs on the honor system: the code is in this repo behind a license check, and you can build it yourself. Buying supports
-the project and gets you the signed, auto-updating build. Details and checkout: **[styky.pages.dev/#pricing](https://styky.pages.dev/#pricing)**.
+the project and gets you the signed, auto-updating build. Details: **[styky.smallhingelabs.com](https://styky.smallhingelabs.com/#pricing)**.
 Design notes: [docs/PRO.md](docs/PRO.md).
 
 ## Known limitations

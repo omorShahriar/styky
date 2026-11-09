@@ -22,12 +22,15 @@ with the Styky updater key.
    - `Styky_<version>_x64-setup.exe`
    - `Styky_<version>_x64-setup.exe.sig`
 3. Generate `latest.json` with `node scripts/latest-json.mjs <version> "<release notes>"`, which writes it to the bundle folder.
+   It also writes `Styky_x64-setup.exe`, an unversioned copy of the installer. Upload it to **every** release (step 4): the website
+   links to `https://github.com/omorShahriar/styky/releases/latest/download/Styky_x64-setup.exe`, so the download button never needs a redeploy.
 4. Tag and publish:
 
    ```powershell
    git tag v<version>; git push origin v<version>
    gh release create v<version> --title "Styky <version>" --notes-file <notes.md> `
      src-tauri\target\release\bundle\nsis\Styky_<version>_x64-setup.exe `
+     src-tauri\target\release\bundle\nsis\Styky_x64-setup.exe `
      src-tauri\target\release\bundle\nsis\Styky_<version>_x64-setup.exe.sig `
      src-tauri\target\release\bundle\nsis\latest.json
    ```
