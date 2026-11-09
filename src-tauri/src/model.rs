@@ -36,9 +36,13 @@ pub struct Item {
     /// When the pre-alert fired for the current due time.
     #[serde(default)]
     pub pre_fired_at: Option<i64>,
-    /// Pro: last time a Critical item re-notified.
+    /// Pro: last time this item re-notified (nagging).
     #[serde(default)]
     pub last_nag_at: Option<i64>,
+    /// Pro: keep re-notifying every N minutes until the item is done or snoozed. Off by default, on any priority;
+    /// never inferred from the priority.
+    #[serde(default)]
+    pub nag: bool,
     /// Wall-clock time of day (minutes after local midnight) a repeating series keeps returning to, so a
     /// reminder pushed forward by a DST gap goes back to its real time afterwards.
     #[serde(default)]
@@ -69,6 +73,7 @@ pub struct ItemEdit {
     pub link: Option<String>,
     pub branch: Option<String>,
     pub prealert_min: Option<i64>,
+    pub nag: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,14 +104,15 @@ pub fn normalize_prealert(p: Option<i64>) -> Option<i64> {
     p.filter(|m| PREALERTS.contains(m))
 }
 
-/// Free builds cannot set Pro-only fields: pre-alerts keep their old value (none for a new item) and advanced
-/// repeats are not accepted. Every priority, Critical included, is free. Values an item already has are never
+/// Free builds cannot set Pro-only fields: pre-alerts keep their old value (none for a new item), nagging can be
+/// kept or switched off but not switched on, and advanced repeats are not accepted. Every priority, Critical included, is free. Values an item already has are never
 /// taken away by an unrelated edit.
 pub fn gate_edit(edit: &mut ItemEdit, existing: Option<&Item>, pro: bool) {
     if pro {
         return;
     }
     edit.prealert_min = existing.and_then(|i| i.prealert_min);
+    edit.nag = edit.nag && existing.is_some_and(|i| i.nag);
     // Advanced repeats (intervals, chosen weekdays, nth weekday, COUNT/UNTIL) are Pro; the simple ones stay free.
     let wanted = normalize_repeat(&edit.repeat);
     if !crate::repeat::is_simple(&wanted) {
@@ -148,6 +154,7 @@ impl Item {
             prealert_min: None,
             pre_fired_at: None,
             last_nag_at: None,
+            nag: false,
             repeat_anchor_min: None,
         }
     }

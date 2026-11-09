@@ -48,8 +48,8 @@ export function Hero() {
           </h1>
           <p className="x-lead">
             Styky is a free, open-source Windows reminder widget with a local CLI and MCP server. Add from anywhere with
-            Ctrl+Alt+N or <code>styky add</code>, get a native notification, and let Critical reminders (Pro) keep
-            nagging until you act.
+            Ctrl+Alt+N or <code>styky add</code>, and get a native notification with Done and Snooze when it is
+            due.
           </p>
           <div className="x-cta">
             <a className="x-btn primary" href={config.downloadUrl} rel="noopener">

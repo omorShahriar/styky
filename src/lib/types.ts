@@ -25,6 +25,8 @@ export interface Item {
   prealertMin: number | null;
   preFiredAt: number | null;
   lastNagAt: number | null;
+  /** Pro: keep re-notifying until done or snoozed. Off by default, on any priority. */
+  nag: boolean;
 }
 
 /** The fields the editor can change. */
@@ -38,6 +40,7 @@ export interface ItemEdit {
   link: string | null;
   branch: string | null;
   prealertMin: number | null;
+  nag: boolean;
 }
 
 export interface ImportResult {
@@ -56,6 +59,7 @@ export const emptyEdit = (): ItemEdit => ({
   link: null,
   branch: null,
   prealertMin: null,
+  nag: false,
 });
 
 export const toEdit = (i: Item): ItemEdit => ({
@@ -68,4 +72,5 @@ export const toEdit = (i: Item): ItemEdit => ({
   link: i.link,
   branch: i.branch,
   prealertMin: i.prealertMin,
+  nag: i.nag,
 });

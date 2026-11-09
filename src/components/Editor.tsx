@@ -210,6 +210,23 @@ export function Editor({ initial, itemId, tags, onCreated, onClose, onError }: P
 
       <div className="ed-field">
         <span className="ed-label">
+          Nag {!pro && <ProPill />}
+        </span>
+        <select
+          className="ed-input"
+          value={edit.nag ? "1" : "0"}
+          disabled={edit.dueAt == null || (!pro && !edit.nag)}
+          title={edit.dueAt == null ? "Set a due time first" : undefined}
+          onChange={(e) => patch({ nag: e.target.value === "1" })}
+          aria-label="Nag until done"
+        >
+          <option value="0">Off</option>
+          <option value="1">Until done or snoozed</option>
+        </select>
+      </div>
+
+      <div className="ed-field">
+        <span className="ed-label">
           Priority
         </span>
         <div className="segmented" role="radiogroup" aria-label="Priority">

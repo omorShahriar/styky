@@ -39,6 +39,7 @@ impl ApiStatus {
 /// Feature names used in `requires_pro` errors (the sentence is "<name> is a Styky Pro feature: <url>").
 pub const FEATURE_ADVANCED_REPEATS: &str = "Advanced repeats";
 pub const FEATURE_EARLY_WARNINGS: &str = "Early warnings";
+pub const FEATURE_NAGGING: &str = "Nagging";
 
 /// The one place that decides whether a repeat is Pro: anything outside none / daily / weekdays / weekly / monthly.
 /// (Same rule as the UI's free options; see `repeat::is_simple`.)
@@ -144,6 +145,13 @@ fn add(ctx: &Ctx, p: &Value) -> Out {
     if !ctx.pro && prealert.is_some() {
         return Err(requires_pro(FEATURE_EARLY_WARNINGS));
     }
+    let nag = match p.get("nag") {
+        Some(v) => parse_nag(v)?,
+        None => false,
+    };
+    if !ctx.pro && nag {
+        return Err(requires_pro(FEATURE_NAGGING));
+    }
     let mut edit = ItemEdit {
         title: q.title,
         body_md: str_field(p, "notes").unwrap_or("").to_string(),
@@ -154,6 +162,7 @@ fn add(ctx: &Ctx, p: &Value) -> Out {
         link: q.link,
         branch: q.branch,
         prealert_min: prealert,
+        nag,
     };
     gate_edit(&mut edit, None, ctx.pro);
     let item = ctx.db.create(&edit, ctx.now).map_err(internal)?;
@@ -220,7 +229,15 @@ fn update(ctx: &Ctx, p: &Value) -> Out {
         link: item.link.clone(),
         branch: item.branch.clone(),
         prealert_min: item.prealert_min,
+        nag: item.nag,
     };
+    if let Some(v) = p.get("nag") {
+        e.nag = parse_nag(v)?;
+        // Switching nagging off is always allowed; switching it on is Pro.
+        if !ctx.pro && e.nag && !item.nag {
+            return Err(requires_pro(FEATURE_NAGGING));
+        }
+    }
     if let Some(v) = p.get("prealert") {
         e.prealert_min = parse_prealert(v)?;
         if !ctx.pro && e.prealert_min.is_some() {
@@ -302,6 +319,21 @@ fn parse_priority(v: &Value) -> Result<i64, ApiError> {
         Some("urgent") | Some("high") => Ok(2),
         Some("critical") => Ok(3),
         _ => Err(bad("priority must be low, normal, urgent or critical")),
+    }
+}
+
+/// `true` / `false` (also `"on"` / `"off"`, `1` / `0`, for CLI flags).
+fn parse_nag(v: &Value) -> Result<bool, ApiError> {
+    match v {
+        Value::Bool(b) => Ok(*b),
+        Value::Number(n) if n.as_i64() == Some(1) => Ok(true),
+        Value::Number(n) if n.as_i64() == Some(0) => Ok(false),
+        Value::String(s) => match s.trim().to_lowercase().as_str() {
+            "on" | "true" | "yes" | "1" => Ok(true),
+            "off" | "false" | "no" | "0" | "" => Ok(false),
+            _ => Err(bad("nag must be on or off")),
+        },
+        _ => Err(bad("nag must be true or false")),
     }
 }
 
@@ -405,6 +437,7 @@ pub fn view(i: &Item, now: i64) -> Value {
         "repeat": i.repeat,
         "priority": priority_name(i.priority),
         "prealertMin": i.prealert_min,
+        "nag": i.nag,
         "tag": i.tag,
         "link": i.link,
         "branch": i.branch,
@@ -863,6 +896,34 @@ mod tests {
         for r in ["FREQ=DAILY", "FREQ=WEEKLY;INTERVAL=2", "weekend"] {
             assert!(repeat_is_advanced(r), "{r}");
         }
+    }
+
+    #[test]
+    fn nagging_is_a_per_reminder_flag_that_is_off_by_default_and_pro_to_switch_on() {
+        let db = Db::open_memory().unwrap();
+        // Off by default, whatever the priority.
+        let c = run(&db, false, "add", json!({"title": "c", "priority": "critical"})).unwrap();
+        assert_eq!((c["priority"].as_str(), c["nag"].as_bool()), (Some("critical"), Some(false)));
+        // Free: asking for it is refused with the feature name and the URL; nothing is created or changed.
+        let e = run(&db, false, "add", json!({"title": "n", "nag": true})).unwrap_err();
+        assert_eq!(e.code, REQUIRES_PRO);
+        assert_eq!(e.message, "Nagging is a Styky Pro feature: https://styky.smallhingelabs.com/pro");
+        assert_eq!(e.data, Some(json!({"feature": "Nagging", "url": "https://styky.smallhingelabs.com/pro"})));
+        assert_eq!(db.list(NOW).unwrap().len(), 1);
+        let e = run(&db, false, "update", json!({"id": c["id"], "nag": "on"})).unwrap_err();
+        assert_eq!(e.code, REQUIRES_PRO);
+        assert!(!db.list(NOW).unwrap()[0].nag);
+        // Free may say "off".
+        assert_eq!(run(&db, false, "update", json!({"id": c["id"], "nag": false})).unwrap()["nag"], false);
+        // Pro: on any priority, and update can switch it back.
+        let n = run(&db, true, "add", json!({"title": "n", "nag": true, "priority": "low"})).unwrap();
+        assert_eq!((n["priority"].as_str(), n["nag"].as_bool()), (Some("low"), Some(true)));
+        assert_eq!(run(&db, true, "update", json!({"id": n["id"], "nag": "off"})).unwrap()["nag"], false);
+        assert_eq!(run(&db, true, "update", json!({"id": n["id"], "nag": "maybe"})).unwrap_err().code, "invalid_params");
+        // A flag set under Pro survives a Free edit of something else, and Free may switch it off.
+        run(&db, true, "update", json!({"id": n["id"], "nag": true})).unwrap();
+        assert_eq!(run(&db, false, "update", json!({"id": n["id"], "title": "renamed"})).unwrap()["nag"], true);
+        assert_eq!(run(&db, false, "update", json!({"id": n["id"], "nag": false})).unwrap()["nag"], false);
     }
 
     #[test]

@@ -7,9 +7,9 @@
 **Reminders you control from Claude, your terminal and git hooks.**
 
 A free, open-source Windows reminder widget with a local CLI and MCP server. Add a reminder with `Ctrl+Alt+N`,
-`styky add "Deploy api fri 5pm #infra !!"` or a git hook. Get a native notification when it is due, and let
-Critical reminders (Pro) keep nagging until you act. The always-visible glass panel on your desktop shows what is
-coming. Local-first: no account, no cloud, no telemetry.
+`styky add "Deploy api fri 5pm #infra !!"` or a git hook. Get a native notification when it is due, with Done and
+Snooze on it. The always-visible glass panel on your desktop shows what is coming. Local-first: no account, no cloud,
+no telemetry.
 
 ```powershell
 styky add "Deploy api fri 5pm #infra !!"      # free
@@ -34,8 +34,9 @@ until it's too late: *deploy on Friday*, *rotate the keys*, *check CI after the 
 
 - **Set it from anywhere.** `Ctrl+Alt+N` from any app, `styky add` from a terminal or git hook, or ask Claude through MCP.
   They all share one grammar: `Deploy api fri 5pm #infra !!`.
-- **It nags until it is done.** A native Windows notification fires on time with **Done** and **Snooze** on it. With Pro, a
-  Critical reminder (`!!!`) re-notifies every 10 minutes (configurable) until you complete or snooze it.
+- **It tells you on time.** A native Windows notification fires when the reminder is due, with **Done** and **Snooze**
+  on it. Every priority, Critical (`!!!`) included, is free. With Pro you can switch on **Nag** for a reminder, on any
+  priority, and it re-notifies every 10 minutes (configurable) until you complete or snooze it.
 - **Visible and local.** One frosted-glass panel lives on the desktop layer behind your windows. Reminders sit in a SQLite
   file on your machine, and the local API is a named pipe only your Windows user can open.
 
@@ -229,8 +230,8 @@ Merge @release/2.3 in 2h
 Styky stays free and MIT-licensed, and nothing that was free becomes paid. **Styky Pro** is an optional one-time unlock
 (**$12**, no subscription, coming Nov 30):
 
-- the rest of the CLI and MCP tools: `get`, `done`, `snooze`, `edit`, `rm`
-- **Critical** reminders that re-notify until you act, and pre-alerts (5 minutes to 1 day before)
+- **Nagging**: switch it on per reminder, any priority, and it re-notifies until you act
+- early warnings: a heads-up before the due time (5 minutes to 1 day before)
 - advanced repeats (every 2 weeks, Mon/Wed/Fri, the last Friday of the month, end after N times or on a date)
 - themes (tint, transparency, density, accent, paper skin, font size)
 

@@ -74,7 +74,7 @@ export function Connect() {
               <h3>
                 Claude Code <Tag tier="free" />
               </h3>
-              <p>One command. Add and list are free; complete, snooze, update and delete need Pro.</p>
+              <p>One command. All seven tools are free.</p>
               <Code code="claude mcp add styky -- styky mcp" label="Add the Styky MCP server to Claude Code" />
             </div>
           </Reveal>
@@ -105,14 +105,14 @@ $ styky ls --overdue --tag infra --json`}
                 label="Add and list reminders from a terminal"
               />
               <p className="x-snip-sub">
-                <Tag tier="pro" /> <code>!!!</code> is Critical and keeps re-notifying. <code>get</code>,{" "}
-                <code>done</code>, <code>snooze</code>, <code>edit</code> and <code>rm</code> are Pro too.
+                <code>!!!</code> is Critical. <code>get</code>, <code>done</code>, <code>snooze</code>,{" "}
+                <code>edit</code> and <code>rm</code> are free too.
               </p>
               <Code
                 code={`$ styky add "Rotate prod keys fri 10am #infra !!!"
 $ styky done a1b2c3d4
 $ styky snooze a1b2c3d4 "tomorrow 9am"`}
-                label="Pro commands: critical add, done, snooze"
+                label="Critical add, done, snooze"
               />
             </div>
           </Reveal>
@@ -139,10 +139,9 @@ $ styky snooze a1b2c3d4 "tomorrow 9am"`}
                 &ldquo;Remind me to rotate the keys on Friday.&rdquo;
               </h3>
               <p style={{ marginTop: 12, fontSize: 16, color: "var(--label-2)" }}>
-                <Tag tier="free" /> <code>styky_add</code>, <code>styky_list</code>
-                <br />
-                <Tag tier="pro" /> <code>styky_get</code>, <code>styky_complete</code>, <code>styky_snooze</code>,{" "}
-                <code>styky_update</code>, <code>styky_delete</code>
+                <Tag tier="free" /> <code>styky_add</code>, <code>styky_list</code>, <code>styky_get</code>,{" "}
+                <code>styky_complete</code>, <code>styky_snooze</code>, <code>styky_update</code>,{" "}
+                <code>styky_delete</code>
               </p>
               <p style={{ marginTop: 12, fontSize: 14.5, color: "var(--label-2)" }}>
                 <b>ChatGPT:</b> it only connects to remote HTTPS MCP servers today, so it cannot launch a local one

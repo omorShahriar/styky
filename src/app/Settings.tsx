@@ -512,17 +512,17 @@ export default function Settings() {
         <ConnectAI />
 
         <Group
-          title="Escalation"
-          footer="Critical reminders (priority !!! or Critical in the editor) notify again until you mark them done or snooze them."
+          title="Nagging"
+          footer="Turn on Nag in a reminder's editor and it notifies again until you mark it done or snooze it. Off by default, on any priority."
         >
-          <Row label="Critical re-notify every" hint={pro ? undefined : "Styky Pro"}>
+          <Row label="Nag every" hint={pro ? undefined : "Styky Pro"}>
             <span className="row-inline">
               {!pro && <ProPill />}
               <select
                 value={settings.escalation_minutes ?? "10"}
                 disabled={!pro}
                 onChange={(e) => void set("escalation_minutes", e.target.value)}
-                aria-label="Critical re-notify interval"
+                aria-label="Nag interval"
               >
                 {NAG_MINUTES.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -532,12 +532,12 @@ export default function Settings() {
               </select>
             </span>
           </Row>
-          <Row label="Bring the panel forward" hint="Raise Styky with each re-notification">
+          <Row label="Bring the panel forward" hint="Raise Styky with each nag">
             <span className="row-inline">
               {!pro && <ProPill />}
               <span className={pro ? "" : "locked"}>
                 <Switch
-                  label="Bring the panel forward on re-notify"
+                  label="Bring the panel forward on nag"
                   checked={pro && settings.escalation_bring_forward === "1"}
                   onChange={(v) => pro && void set("escalation_bring_forward", v ? "1" : "0")}
                 />

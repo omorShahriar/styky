@@ -86,6 +86,13 @@ async fn free_tier_runs_every_command_and_refuses_only_the_pro_feature() {
         assert_eq!(stdout(&o), "");
         assert!(stdout(&cli(&u, &["get", &id])).contains("Release v2.4"));
 
+        // Nagging is Pro too, and switching it off is not.
+        let o = cli(&u, &["edit", &id, "--nag", "on"]);
+        assert_eq!(o.status.code(), Some(3));
+        assert_eq!(stderr(&o), "Nagging is a Styky Pro feature: https://styky.smallhingelabs.com/pro\n");
+        let o = cli(&u, &["edit", &id, "--nag", "off"]);
+        assert!(o.status.success(), "{}", stderr(&o));
+
         let o = cli(&u, &["done", &id]);
         assert!(o.status.success(), "{}", stderr(&o)); // weekly with no due time: completes
         let o = cli(&u, &["rm", &id]);
@@ -169,6 +176,11 @@ async fn mcp_server_speaks_stdio_end_to_end() {
         assert_eq!(gated["result"]["structuredContent"]["feature"], "Advanced repeats");
         assert_eq!(gated["result"]["structuredContent"]["url"], "https://styky.smallhingelabs.com/pro");
         assert_eq!(gated["result"]["content"][0]["text"], "Advanced repeats is a Styky Pro feature: https://styky.smallhingelabs.com/pro");
+        let nag = rpc(json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"styky_update","arguments":{"id": id, "nag": true}}}));
+        assert_eq!(nag["result"]["isError"], true);
+        assert_eq!(nag["result"]["structuredContent"]["code"], "requires_pro");
+        assert_eq!(nag["result"]["structuredContent"]["feature"], "Nagging");
+        assert_eq!(nag["result"]["content"][0]["text"], "Nagging is a Styky Pro feature: https://styky.smallhingelabs.com/pro");
         let del = rpc(json!({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"styky_delete","arguments":{"id": id}}}));
         assert_eq!(del["result"]["isError"], false, "{del}");
         drop(stdin);

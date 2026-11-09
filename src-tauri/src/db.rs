@@ -71,8 +71,11 @@ const SCHEMA_V4: &str = "ALTER TABLE items ADD COLUMN prealert_min INTEGER;
 /// The time of day a repeating series keeps (DST-gap safe).
 const SCHEMA_V5: &str = "ALTER TABLE items ADD COLUMN repeat_anchor_min INTEGER;";
 
+/// Nagging is a per-reminder opt-in (Pro). Every existing reminder starts with it off; it is never derived from the priority.
+const SCHEMA_V6: &str = "ALTER TABLE items ADD COLUMN nag INTEGER NOT NULL DEFAULT 0;";
+
 const COLS: &str = "id, title, body_md, due_at, repeat, priority, tag, link, branch, status, \
-                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day, \n                    prealert_min, pre_fired_at, last_nag_at, repeat_anchor_min";
+                    snoozed_until, last_fired_at, completed_at, sort_order, created_at, updated_at, repeat_anchor_day, \n                    prealert_min, pre_fired_at, last_nag_at, repeat_anchor_min, nag";
 
 fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
     Ok(Item {
@@ -97,13 +100,14 @@ fn row_to_item(r: &Row) -> rusqlite::Result<Item> {
         pre_fired_at: r.get(18)?,
         last_nag_at: r.get(19)?,
         repeat_anchor_min: r.get(20)?,
+        nag: r.get::<_, i64>(21)? != 0,
     })
 }
 
 fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
     conn.execute(
         &format!(
-            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)"
+            "INSERT OR REPLACE INTO items ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)"
         ),
         params![
             i.id,
@@ -126,7 +130,8 @@ fn upsert(conn: &Connection, i: &Item) -> rusqlite::Result<()> {
             i.prealert_min,
             i.pre_fired_at,
             i.last_nag_at,
-            i.repeat_anchor_min
+            i.repeat_anchor_min,
+            i.nag
         ],
     )?;
     Ok(())
@@ -208,7 +213,7 @@ impl Db {
         Ok(())
     }
 
-    /// Record that these Critical items re-notified.
+    /// Record that these items re-notified (nagging).
     pub fn mark_nagged(&self, ids: &[String], now: i64) -> Res<()> {
         let conn = self.conn();
         for id in ids {
@@ -253,6 +258,7 @@ impl Db {
             prealert_min: normalize_prealert(edit.prealert_min),
             pre_fired_at: None,
             last_nag_at: None,
+            nag: edit.nag,
             repeat_anchor_min: None,
         };
         let mut item = item;
@@ -278,6 +284,10 @@ impl Db {
         if item.prealert_min != prealert {
             item.pre_fired_at = None;
             item.prealert_min = prealert;
+        }
+        if item.nag != edit.nag {
+            item.last_nag_at = None;
+            item.nag = edit.nag;
         }
         item.title = edit.title.trim().to_string();
         item.body_md = edit.body_md.clone();
@@ -595,6 +605,10 @@ fn migrate(conn: &Connection) -> Res<()> {
         conn.execute_batch(&format!("BEGIN; {SCHEMA_V5} PRAGMA user_version = 5; COMMIT;"))
             .map_err(err)?;
     }
+    if version < 6 {
+        conn.execute_batch(&format!("BEGIN; {SCHEMA_V6} PRAGMA user_version = 6; COMMIT;"))
+            .map_err(err)?;
+    }
     Ok(())
 }
 
@@ -793,7 +807,47 @@ mod tests {
         assert_eq!((items[0].title.as_str(), items[0].prealert_min, items[0].last_nag_at), ("old", None, None));
         assert_eq!(db.license_get().unwrap(), None);
         let v: i64 = db.conn().pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
-        assert_eq!(v, 5);
+        assert_eq!(v, 6);
+    }
+
+    #[test]
+    fn migration_v6_leaves_nagging_off_for_every_existing_reminder_critical_ones_included() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(&format!("{SCHEMA_V1} {SCHEMA_V2} {SCHEMA_V3} {SCHEMA_V4} {SCHEMA_V5} PRAGMA user_version = 5;")).unwrap();
+        for (id, prio) in [("a", 0), ("b", 1), ("c", 2), ("d", 3)] {
+            conn.execute(
+                "INSERT INTO items (id, title, sort_order, created_at, updated_at, due_at, priority, last_nag_at) VALUES (?1, ?1, 1, 1, 1, 5000, ?2, 4000)",
+                params![id, prio],
+            )
+            .unwrap();
+        }
+        let db = Db::init(conn).unwrap();
+        let items = db.list(0).unwrap();
+        assert_eq!(items.len(), 4);
+        assert!(items.iter().all(|i| !i.nag), "no existing reminder may nag after the migration");
+        assert_eq!(items.iter().filter(|i| i.priority == 3).count(), 1);
+        let v: i64 = db.conn().pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
+        assert_eq!(v, 6);
+    }
+
+    #[test]
+    fn the_nag_flag_round_trips_through_create_update_and_export() {
+        let db = Db::open_memory().unwrap();
+        let mut e = edit("x");
+        e.nag = true;
+        let it = db.create(&e, 1).unwrap();
+        assert!(it.nag);
+        db.mark_nagged(std::slice::from_ref(&it.id), 5).unwrap();
+        assert_eq!(db.update(&it.id, &e, 2).unwrap().last_nag_at, Some(5), "an unrelated edit keeps the nag clock");
+        e.nag = false;
+        let u = db.update(&it.id, &e, 3).unwrap();
+        assert_eq!((u.nag, u.last_nag_at), (false, None));
+        // Old exports (no `nag` field) import as "off".
+        let mut file = db.export(0).unwrap();
+        file.items[0].nag = true;
+        let json = serde_json::to_string(&file).unwrap().replace("\"nag\":true,", "");
+        let back: crate::model::ExportFile = serde_json::from_str(&json).unwrap();
+        assert!(!back.items[0].nag);
     }
 
     #[test]

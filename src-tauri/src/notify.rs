@@ -88,7 +88,7 @@ pub fn when_text(at: i64, now: i64) -> String {
 pub enum Kind {
     /// The reminder is due.
     Due,
-    /// Critical item, still open: "Still due".
+    /// Item with the nag flag, still open: "Still due".
     Nag,
 }
 
@@ -224,7 +224,7 @@ pub fn show_prealert(app: &AppHandle, item: &Item) {
     }
 }
 
-/// Re-notification of a Critical item (Pro). Same tag as the due toast: it replaces the previous one instead of stacking.
+/// Re-notification of an item with the nag flag on (Pro). Same tag as the due toast: it replaces the previous one instead of stacking.
 pub fn show_nag(app: &AppHandle, item: &Item) {
     let xml = item_xml_kind(item, now_ms(), &default_snooze(app), Kind::Nag);
     if let Err(e) = show_xml(app, &xml, Some(&item.id)) {

@@ -5,7 +5,7 @@
 //!   styky get <id>
 //!   styky done <id>
 //!   styky snooze <id> 1h|30m|"tomorrow 9am"
-//!   styky edit <id> [--title t] [--due when|none] [--tag t] [--priority p] [--notes n]
+//!   styky edit <id> [--title t] [--due when|none] [--tag t] [--priority p] [--notes n] [--nag on|off]
 //!   styky rm <id>
 //!   styky mcp                                     run an MCP server on stdio for Claude / ChatGPT / any MCP client
 //!
@@ -31,12 +31,12 @@ USAGE
   styky get <id> [--json]
   styky done <id>
   styky snooze <id> <when>          e.g. 1h, 30m, \"tomorrow 9am\"
-  styky edit <id> [--title t] [--due when|none] [--tag t] [--priority low|normal|urgent|critical] [--notes n] [--repeat r]
+  styky edit <id> [--title t] [--due when|none] [--tag t] [--priority low|normal|urgent|critical] [--notes n] [--repeat r] [--nag on|off]
   styky rm <id>
   styky mcp                         run an MCP server on stdio (for Claude, ChatGPT, any MCP client)
 
 <id> is the 8-character id shown by `styky ls` (any unique prefix works).
-Every command is free. Pro features (advanced repeats) are refused with exit code 3.";
+Every command is free. Pro features (advanced repeats, nagging) are refused with exit code 3.";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -212,6 +212,7 @@ fn exec(args: &[String], call: CallFn, out: &mut String) -> Result<(), ApiError>
                 ("--repeat", "repeat"),
                 ("--link", "link"),
                 ("--branch", "branch"),
+                ("--nag", "nag"),
             ] {
                 if let Some(v) = flag_value(&mut rest, flag_name)? {
                     p[key] = json!(v);
@@ -377,6 +378,9 @@ mod tests {
 
     #[test]
     fn errors_have_exit_codes_and_clear_text() {
+        let (code, out, c) = exec_with(&["edit", "a1b2", "--nag", "on"], |_, _| Err(ApiError::requires_pro("Nagging")));
+        assert_eq!((code, out.as_str()), (3, "Nagging is a Styky Pro feature: https://styky.smallhingelabs.com/pro\n"));
+        assert_eq!(c[0], ("update".to_string(), json!({"id": "a1b2", "nag": "on"})));
         let (code, out, _) = exec_with(&["edit", "a1b2", "--repeat", "FREQ=DAILY;INTERVAL=2"], |_, _| Err(ApiError::requires_pro("Advanced repeats")));
         assert_eq!(code, 3);
         assert_eq!(out, "Advanced repeats is a Styky Pro feature: https://styky.smallhingelabs.com/pro\n");

@@ -38,6 +38,7 @@ function seed(): Item[] {
     prealertMin: null,
     preFiredAt: null,
     lastNagAt: null,
+    nag: false,
     ...o,
   });
   return [

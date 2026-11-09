@@ -149,5 +149,6 @@ export function toItemEdit(p: QuickParse): ItemEdit {
     link: p.link,
     branch: p.branch,
     prealertMin: null,
+    nag: false,
   };
 }

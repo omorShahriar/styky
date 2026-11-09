@@ -23,8 +23,8 @@ export function Problem() {
     },
     {
       icon: BellRing,
-      title: "Keeps nagging until it is done",
-      text: "Native Windows toasts with Done and Snooze. With Pro, a Critical reminder (!!!) re-notifies every 10 minutes by default until you complete or snooze it.",
+      title: "Notifies on time",
+      text: "Native Windows toasts with Done and Snooze, a Snooze dropdown and a missed-while-away summary when the PC was off or asleep.",
     },
     {
       icon: Lock,
@@ -69,7 +69,7 @@ export function Problem() {
 const FEATURES: { icon: typeof Zap; title: string; text: string; pro?: boolean }[] = [
   { icon: Plus, title: "Global quick add", text: "A Spotlight-style bar with natural-language dates, #tags, @branch, !! priority, repeats and links. One shortcut, from any app." },
   { icon: BellRing, title: "Native notifications", text: "Windows toasts with a Snooze dropdown (10 min, 1 hour, this evening, tomorrow, custom) and Done." },
-  { icon: Zap, title: "Critical and pre-alerts", text: "Critical re-notifies every N minutes until you act. Pre-alerts warn 5 minutes to 1 day ahead.", pro: true },
+  { icon: Zap, title: "Priorities", text: "Low, normal, urgent and critical, from the editor, quick-add (!!, !!!), the CLI or MCP." },
   { icon: Code2, title: "Built for developers", text: "A branch chip (@release/2.3) that copies on click, a link field, project tags, and a CLI and MCP server." },
   { icon: Repeat, title: "Repeats that behave", text: "Daily, weekdays, weekly, monthly, with the 31st clamped to shorter months. Pro adds every 2 weeks, Mon/Wed/Fri, the last Friday of the month, end after N times." },
   { icon: FileText, title: "Markdown details", text: "Notes, code, links and checklists you can tick, right in the widget." },
@@ -243,10 +243,8 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     q: "What works without Pro?",
     a: (
       <p>
-        Everything in the panel, plus <code>styky add</code>, <code>styky ls</code> and the MCP tools{" "}
-        <code>styky_add</code> and <code>styky_list</code>. Pro adds <code>get</code>, <code>done</code>,{" "}
-        <code>snooze</code>, <code>edit</code> and <code>rm</code> (and the matching MCP tools), Critical reminders,
-        pre-alerts, themes and advanced repeats.
+        Everything in the panel, every priority including Critical, the whole <code>styky</code> CLI and all seven MCP
+        tools. Pro adds advanced repeats, nagging, early warnings and themes.
       </p>
     ),
   },

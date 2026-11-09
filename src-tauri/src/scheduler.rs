@@ -12,7 +12,7 @@ use tokio::sync::Notify;
 
 use crate::commands::now_ms;
 use crate::db::Db;
-use crate::model::{Item, PRIORITY_CRITICAL};
+use crate::model::Item;
 use crate::notify;
 
 const MAX_SLEEP_MS: i64 = 30_000;
@@ -51,7 +51,7 @@ pub struct Plan {
     pub due: Vec<Item>,
     /// Pro: items whose pre-alert time has arrived (still before the due time).
     pub pre: Vec<Item>,
-    /// Pro: Critical items that were notified and are still open: notify again.
+    /// Pro: items with the nag flag on that were notified and are still open: notify again.
     pub nag: Vec<Item>,
     pub next: Option<i64>,
 }
@@ -60,7 +60,7 @@ pub struct Plan {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Escalation {
     pub pro: bool,
-    /// Minutes between Critical re-notifications.
+    /// Minutes between re-notifications of an item with the nag flag.
     pub nag_minutes: i64,
 }
 
@@ -79,8 +79,9 @@ pub fn plan(items: &[Item], now: i64, esc: Escalation) -> Plan {
             // Fired already for this (possibly snoozed) time?
             if item.last_fired_at.is_none_or(|f| f < at) {
                 p.due.push(item.clone());
-            } else if esc.pro && item.priority == PRIORITY_CRITICAL {
-                // Notified, still open: nag every N minutes since the last notification.
+            } else if esc.pro && item.nag {
+                // Nagging is an opt-in per reminder (any priority) and a Pro feature. Notified, still open:
+                // nag every N minutes since the last notification.
                 let since = item.last_fired_at.unwrap_or(0).max(item.last_nag_at.unwrap_or(0));
                 let again = since + esc.nag_minutes.max(1) * 60_000;
                 if again <= now {
@@ -253,6 +254,7 @@ mod tests {
             prealert_min: None,
             pre_fired_at: None,
             last_nag_at: None,
+            nag: false,
             repeat_anchor_min: None,
         }
     }
@@ -350,26 +352,50 @@ mod tests {
         assert!(plan(&[it], 190 * MIN, PRO).pre.is_empty());
     }
 
-    fn critical(due: i64, fired: Option<i64>, nagged: Option<i64>) -> Item {
+    /// An open item with the nag flag on. Normal priority on purpose: nagging does not depend on Critical.
+    fn nagging(due: i64, fired: Option<i64>, nagged: Option<i64>) -> Item {
         let mut i = item("c", Some(due), None, fired);
-        i.priority = 3;
+        i.nag = true;
         i.last_nag_at = nagged;
         i
     }
 
     #[test]
-    fn critical_items_re_notify_every_n_minutes_after_the_first_toast() {
+    fn nagging_needs_both_pro_and_the_flag() {
+        let due = 100 * MIN;
+        let now = 150 * MIN;
+        let mut on = nagging(due, Some(due), None);
+        let mut off = on.clone();
+        off.nag = false;
+        // Pro + flag on: a non-Critical reminder nags. Free + flag on, Pro + flag off, Free + flag off: silent.
+        assert_eq!(on.priority, 1);
+        assert_eq!(plan(std::slice::from_ref(&on), now, PRO).nag.len(), 1);
+        assert!(plan(std::slice::from_ref(&on), now, FREE).nag.is_empty());
+        assert!(plan(std::slice::from_ref(&off), now, PRO).nag.is_empty());
+        assert!(plan(std::slice::from_ref(&off), now, FREE).nag.is_empty());
+        // Critical alone never nags, whatever the licence.
+        off.priority = 3;
+        assert!(plan(std::slice::from_ref(&off), now, PRO).nag.is_empty());
+        // Any priority nags once the flag is on.
+        for p in 0..=3 {
+            on.priority = p;
+            assert_eq!(plan(std::slice::from_ref(&on), now, PRO).nag.len(), 1, "priority {p}");
+        }
+    }
+
+    #[test]
+    fn items_with_the_nag_flag_re_notify_every_n_minutes_after_the_first_toast() {
         let due = 100 * MIN;
         // The first fire is the normal one, not a nag.
-        let p = plan(&[critical(due, None, None)], due, PRO);
+        let p = plan(&[nagging(due, None, None)], due, PRO);
         assert_eq!((p.due.len(), p.nag.len()), (1, 0));
         // Fired at 100: quiet until 110, then nag; next nag 10 minutes after the last nag.
-        let fired = critical(due, Some(100 * MIN), None);
+        let fired = nagging(due, Some(100 * MIN), None);
         let p = plan(std::slice::from_ref(&fired), 105 * MIN, PRO);
         assert!(p.nag.is_empty() && p.due.is_empty());
         assert_eq!(p.next, Some(110 * MIN));
         assert_eq!(plan(std::slice::from_ref(&fired), 110 * MIN, PRO).nag.len(), 1);
-        let nagged = critical(due, Some(100 * MIN), Some(110 * MIN));
+        let nagged = nagging(due, Some(100 * MIN), Some(110 * MIN));
         assert!(plan(std::slice::from_ref(&nagged), 115 * MIN, PRO).nag.is_empty());
         assert_eq!(plan(std::slice::from_ref(&nagged), 115 * MIN, PRO).next, Some(120 * MIN));
         assert_eq!(plan(std::slice::from_ref(&nagged), 120 * MIN, PRO).nag.len(), 1);
@@ -381,10 +407,10 @@ mod tests {
     #[test]
     fn nagging_stops_when_done_snoozed_downgraded_or_not_pro() {
         let due = 100 * MIN;
-        let base = critical(due, Some(100 * MIN), None);
+        let base = nagging(due, Some(100 * MIN), None);
         let now = 150 * MIN;
         assert_eq!(plan(std::slice::from_ref(&base), now, PRO).nag.len(), 1);
-        // Free build: critical behaves like any other item (no nag).
+        // Free build: the flag is ignored (no nag).
         assert!(plan(std::slice::from_ref(&base), now, FREE).nag.is_empty());
         let mut done = base.clone();
         done.status = "done".into();
@@ -399,17 +425,20 @@ mod tests {
         assert_eq!(p.next, Some(200 * MIN));
         let p = plan(&[snoozed], 200 * MIN, PRO);
         assert_eq!((p.due.len(), p.nag.len()), (1, 0));
-        // Urgent (not critical) never nags.
+        // Flag off: never nags, even when Urgent or Critical.
         let mut urgent = base;
-        urgent.priority = 2;
-        assert!(plan(&[urgent], now, PRO).nag.is_empty());
+        urgent.nag = false;
+        for p in [2, 3] {
+            urgent.priority = p;
+            assert!(plan(std::slice::from_ref(&urgent), now, PRO).nag.is_empty(), "priority {p}");
+        }
     }
 
     #[test]
     fn a_pass_never_double_fires_when_markers_are_written_first() {
         // Simulate the run loop: plan, write markers (as mark_* do), plan again at the same instant.
         let now = 100 * MIN;
-        let mut it = critical(now, None, None);
+        let mut it = nagging(now, None, None);
         it.prealert_min = Some(5);
         let p1 = plan(std::slice::from_ref(&it), now, PRO);
         assert_eq!(p1.due.len(), 1);
