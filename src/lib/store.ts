@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api } from "./api";
+import { QUIET_ATTEMPTS, retryDelay } from "./retry";
 import { formatDue } from "./time";
 import type { Item } from "./types";
 
@@ -53,6 +54,8 @@ interface State {
 
 let toastSeq = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let loadAttempts = 0;
+let loadRetryTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useStore = create<State>((set, get) => ({
   items: [],
@@ -84,6 +87,8 @@ export const useStore = create<State>((set, get) => ({
   refresh: async () => {
     try {
       const [items, settings] = await Promise.all([api.listItems(), api.getSettings()]);
+      loadAttempts = 0;
+      clearTimeout(loadRetryTimer);
       const ids = new Set(items.map((i) => i.id));
       const { expandedId, focusedId } = get();
       set({
@@ -97,7 +102,16 @@ export const useStore = create<State>((set, get) => ({
         focusedId: focusedId && ids.has(focusedId) ? focusedId : null,
       });
     } catch (e) {
-      get().showToast(`Could not load reminders: ${String(e)}`);
+      if (get().loaded) {
+        get().showToast(`Could not load reminders: ${String(e)}`);
+        return;
+      }
+      // Nothing shown yet: the backend may still be starting up. Retry soon rather than waiting for the 30 s tick,
+      // and only bother the user if it keeps failing.
+      loadAttempts += 1;
+      if (loadAttempts === QUIET_ATTEMPTS + 1) get().showToast(`Could not load reminders: ${String(e)}`);
+      clearTimeout(loadRetryTimer);
+      loadRetryTimer = setTimeout(() => void get().refresh(), retryDelay(loadAttempts));
     }
   },
 

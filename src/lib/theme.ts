@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { retryDelay } from "./retry";
 import { applyProTheme, hasAccentOverride } from "./proTheme";
 
 function applyAccent(hex: string) {
@@ -18,6 +19,10 @@ export function applyThemeMode(mode: string | undefined) {
 let windowsAccent = "";
 
 /** Read the saved settings (theme mode + Pro theme) and apply them. */
+let refreshAttempts = 0;
+let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+const MAX_REFRESH_RETRIES = 8;
+
 async function refresh() {
   try {
     const [s, status] = await Promise.all([
@@ -28,8 +33,14 @@ async function refresh() {
     applyProTheme(s, status.pro);
     // Clearing an accent override must bring the Windows accent back.
     if (!hasAccentOverride() && windowsAccent) document.documentElement.style.setProperty("--accent", windowsAccent);
+    refreshAttempts = 0;
   } catch {
-    /* keep following the system */
+    // The backend may still be starting up: try again shortly, then give up and keep following the system.
+    if (refreshAttempts < MAX_REFRESH_RETRIES) {
+      refreshAttempts += 1;
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => void refresh(), retryDelay(refreshAttempts));
+    }
   }
 }
 

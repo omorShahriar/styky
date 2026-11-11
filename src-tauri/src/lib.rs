@@ -56,6 +56,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(core_state())
         .invoke_handler(tauri::generate_handler![
             commands::get_accent,
             commands::get_autostart,
@@ -89,8 +90,6 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle().clone();
-            let db_path = app.path().app_data_dir()?.join("styky.db");
-            app.manage(db::Db::open(&db_path).map_err(|e| format!("cannot open {db_path:?}: {e}"))?);
             first_run_autostart(&handle);
             let win = app
                 .get_webview_window(window::MAIN)
@@ -117,8 +116,6 @@ pub fn run() {
             quickadd::setup(&handle);
             quickadd::init(&handle);
             scheduler::spawn(handle.clone());
-            load_license(&handle);
-            app.manage(std::sync::Arc::new(api::ApiStatus::default()));
             spawn_api(handle.clone());
             Ok(())
         })
@@ -170,6 +167,21 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Styky");
+}
+
+/// State every command depends on. It lives in a plugin because plugin setup runs in `Builder::build`, before Tauri
+/// creates the windows declared in tauri.conf.json (which happens ahead of the `.setup` hook). A page that loads while
+/// a later window is still being created can therefore never invoke a command before the database is managed.
+fn core_state() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    tauri::plugin::Builder::<tauri::Wry>::new("styky-core")
+        .setup(|app, _api| {
+            let db_path = app.path().app_data_dir()?.join("styky.db");
+            app.manage(db::Db::open(&db_path).map_err(|e| format!("cannot open {db_path:?}: {e}"))?);
+            app.manage(std::sync::Arc::new(api::ApiStatus::default()));
+            load_license(app);
+            Ok(())
+        })
+        .build()
 }
 
 /// Serve the local API on the per-user named pipe (see `api.rs`).

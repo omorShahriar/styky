@@ -29,7 +29,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         "autostart",
         "Launch at login",
         true,
-        crate::commands::get_autostart(app.clone()),
+        false,
         None::<&str>,
     )?;
     let sep = PredefinedMenuItem::separator(app)?;
@@ -37,6 +37,14 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[&toggle, &quick, &pause, &settings, &autostart, &sep, &quit])?;
 
     let autostart_item = autostart.clone();
+    // The real state comes from a background task: on a packaged build it is a WinRT call that must not stall setup.
+    {
+        let app = app.clone();
+        let item = autostart.clone();
+        std::thread::spawn(move || {
+            let _ = item.set_checked(crate::commands::get_autostart(app));
+        });
+    }
     let pause_item = pause.clone();
     let mut builder = TrayIconBuilder::with_id("main")
         .tooltip("Styky")

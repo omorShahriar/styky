@@ -187,7 +187,8 @@ pub fn get_accent() -> String {
     theme::accent()
 }
 
-#[tauri::command]
+/// Async so the WinRT StartupTask query (packaged builds) never blocks the main thread, where sync commands run.
+#[tauri::command(async)]
 pub fn get_autostart(app: AppHandle) -> bool {
     if crate::store::is_packaged() {
         return crate::store::startup_state() == Some(crate::store::Startup::Enabled);
@@ -196,7 +197,7 @@ pub fn get_autostart(app: AppHandle) -> bool {
 }
 
 /// Packaged only: launch at login was switched off in Task Manager / by policy and cannot be re-enabled from the app.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn autostart_blocked() -> bool {
     crate::store::is_packaged() && crate::store::startup_state() == Some(crate::store::Startup::Blocked)
 }
@@ -217,7 +218,7 @@ pub fn apply_autostart(app: &AppHandle, enabled: bool) -> bool {
     launcher.is_enabled().unwrap_or(false)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_autostart(app: AppHandle, enabled: bool) -> bool {
     apply_autostart(&app, enabled)
 }

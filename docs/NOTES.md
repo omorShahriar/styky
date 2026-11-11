@@ -326,3 +326,10 @@ Stubbed / not done:
   These are for the "Nagging alignment" prompt.
 - Not run: the installer, the MSIX, anything in a Claude desktop session. No live screenshot of the new Nag control or the About text.
 - Built (not installed): `scripts\build.ps1` produced `Styky_0.2.0_x64-setup.exe` (5.4 MB) and its `.sig`; `node scripts/latest-json.mjs 0.2.0 "<notes>"` wrote `latest.json` and `Styky_x64-setup.exe` and listed all four upload files. Regenerate `latest.json` with the real notes before uploading (the one from the build check used placeholder notes).
+
+## Slow first load after boot (0.2.0 fix)
+- **Race:** Tauri creates every window from `tauri.conf.json` *before* it runs the app `.setup` hook (`app.rs`, private `setup`). Each WebView2 creation pumps the message loop, so on a cold boot the `main` page could mount and call `list_items` / `get_settings` before `Db` was managed. Tauri rejected them ("state not managed"), the window was still hidden so the toast went unseen, and nothing retried until the 30 s tick.
+- **Fix:** `Db`, `ApiStatus` and the licence flag are now set up in a small plugin (`core_state` in `lib.rs`). Plugin setup runs in `Builder::build`, ahead of window creation. `Scheduler` and the theme watcher are still managed in the hook; they are only read via `try_state` or by the hook itself. The frontend also retries (250 ms to 3 s) while `loaded` is false (`store.ts`, `theme.ts`, `retry.ts`), and only toasts after 5 failures.
+- **Store build:** `get_autostart`, `autostart_blocked` and `set_autostart` are `#[tauri::command(async)]`, and `tray::build` no longer waits for the StartupTask query (the menu item starts unchecked and is set from a thread).
+- **Not verified:** the cold-boot behaviour itself. It was never reproduced, and nothing was run in a real autostart or the MSIX build. Checked: tests, clippy, tsc, and the Tauri source order above.
+
