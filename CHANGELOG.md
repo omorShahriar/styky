@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1
+
+Fixes the reminders list staying empty for up to a minute after Windows starts.
+
+### Fixed
+
+- After a cold start the widget could appear before its data was ready, so the list stayed empty until the next refresh. The
+  data is now ready before any window loads, and an early failed load retries within a fraction of a second.
+- Launch at login no longer blocks the app while it is checked on the Store package.
+
 ## 0.2.0
 
 Adds a command line and an MCP server so scripts and AI agents can add reminders that appear on your desktop.
