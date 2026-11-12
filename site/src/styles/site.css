@@ -891,6 +891,12 @@ kbd {
   font-size: 13px;
   color: var(--label-3);
 }
+.x-fine a {
+  color: var(--label-2);
+}
+.x-fine a:hover {
+  color: var(--label);
+}
 .x-fine + .x-fine {
   margin-top: 8px;
 }

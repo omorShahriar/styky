@@ -14,6 +14,7 @@ export const config = {
   author: "Omor Shahriar",
   authorUrl: "https://github.com/omorShahriar",
   publisher: "Small Hinge Labs",
+  publisherUrl: "https://smallhingelabs.com/",
   contactEmail: "hello@smallhingelabs.com",
   lemonBuyerTermsUrl: "https://www.lemonsqueezy.com/buyer-terms",
 } as const;

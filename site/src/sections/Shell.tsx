@@ -91,6 +91,9 @@ export function Footer() {
           </nav>
         </div>
         <p className="x-fine">
+          Made by <a href={config.publisherUrl}>{config.publisher}</a>
+        </p>
+        <p className="x-fine">
           &copy; 2026 {config.author}. Styky is open source under the MIT License. Windows and Windows 11 are
           trademarks of Microsoft; Styky is not affiliated with or endorsed by Microsoft.
         </p>
