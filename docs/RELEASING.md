@@ -59,6 +59,13 @@ Mark a release as a *pre-release* if it should not be offered as an update.
 }
 ```
 
+## Website metadata and the agent flag
+
+The site's agent copy (CLI, MCP, Claude) is on: `SHOW_AGENT_FEATURES_DEFAULT` in `site/vite.config.ts` is `true` and only exists as an off
+switch. The homepage title, description and JSON-LD are generated from `site/site-meta.mjs`: `agentIndex` and the `featureList` for the flag
+on, the plain homepage entry for the flag off. There is nothing to edit by hand in `site/index.html`. The CLI and MCP server ship with the
+GitHub installer only, so keep the Store listing and any Store-facing copy free of those claims. See `site/README.md`.
+
 ## Microsoft Store (MSIX) build
 
 The Store flavor is the same app packaged as **MSIX** by `scripts/build-msix.ps1`. Microsoft signs Store MSIX packages, so no

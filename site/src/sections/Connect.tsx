@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
-import { config, proVersion, versionAtLeast } from "../config";
+import { proVersion, versionAtLeast } from "../config";
 import { release } from "../release";
 import { Reveal, SectionHead } from "./util";
 
@@ -48,6 +48,8 @@ const HOOK = `#!/bin/sh
 branch=$(git rev-parse --abbrev-ref HEAD)
 styky add "Check CI in 15m #ci @$branch" || true
 exit 0`;
+
+const BASE = import.meta.env.BASE_URL;
 
 export function Connect() {
   const shipped = versionAtLeast(release.version, proVersion);
@@ -145,8 +147,7 @@ $ styky snooze a1b2c3d4 "tomorrow 9am"`}
               </p>
               <p style={{ marginTop: 12, fontSize: 14.5, color: "var(--label-2)" }}>
                 <b>ChatGPT:</b> it only connects to remote HTTPS MCP servers today, so it cannot launch a local one
-                like <code>styky mcp</code>. Use the CLI from scripts, and any client that can run a local command. A
-                local HTTP endpoint for ChatGPT is on the roadmap, not shipped.
+                like <code>styky mcp</code>. Use the CLI from scripts, and any client that can run a local command.
               </p>
             </div>
             <div className="x-chat-box" role="img" aria-label="Illustration: asking an AI assistant to add a Styky reminder">
@@ -155,7 +156,7 @@ $ styky snooze a1b2c3d4 "tomorrow 9am"`}
               <div className="x-bubble ai">Added &ldquo;Rotate the keys&rdquo; for Friday at 10:00, marked urgent.</div>
               <p className="x-caption-sm">
                 Illustration. Whatever an assistant reads goes to that assistant, so connect only ones you trust.{" "}
-                <a href={`${config.repoUrl}#use-it-from-claude-chatgpt-and-the-terminal`} rel="noopener">
+                <a href={`${BASE}mcp`}>
                   Full setup and tool list
                 </a>
                 .

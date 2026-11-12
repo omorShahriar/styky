@@ -189,8 +189,8 @@ argument `mcp`. For example:
 
 Settings → **Connect AI** in the app shows the same snippets with a copy button.
 
-**ChatGPT** only connects to remote HTTPS MCP servers today, so it cannot launch a local one such as `styky mcp`. A local HTTP
-endpoint for it is on the roadmap and not shipped. Until then, use the CLI from scripts or any client that can run a local command.
+**ChatGPT** only connects to remote HTTPS MCP servers today, so it cannot launch a local one such as `styky mcp`. Use the CLI
+from scripts or any client that can run a local command.
 
 > Privacy note: what an assistant reads through these tools (titles, due times, notes) goes to that assistant. Connect only
 > clients you trust. Styky itself sends nothing anywhere.

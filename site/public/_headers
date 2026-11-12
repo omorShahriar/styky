@@ -4,3 +4,11 @@
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+
+# Keep Cloudflare's own hostnames (production *.pages.dev and branch previews) out of search results.
+# Host-qualified rules do not match the custom domain styky.smallhingelabs.com.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex

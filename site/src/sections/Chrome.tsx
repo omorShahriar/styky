@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Download, Star } from "lucide-react";
 import { APPROVED_DESCRIPTION, config, SHOW_AGENT_FEATURES, TAGLINE } from "../config";
 import { setSiteTheme } from "../mock/site-theme";
@@ -9,6 +9,23 @@ import { Github, ThemeToggle } from "./Shell";
 const Demo = lazy(() => import("../demo/Demo"));
 
 const BASE = import.meta.env.BASE_URL;
+
+/**
+ * The prerendered page carries the skeleton only; the demo (browser-only mocks) is mounted after hydration. Server and
+ * first client render are both the skeleton, so hydration matches, and the skeleton keeps the final aspect ratio.
+ */
+function DemoSlot() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const skeleton = <div className="x-demo-skeleton" aria-hidden />;
+  return mounted ? (
+    <Suspense fallback={skeleton}>
+      <Demo base={BASE} />
+    </Suspense>
+  ) : (
+    skeleton
+  );
+}
 
 export function Nav() {
   return (
@@ -85,9 +102,7 @@ export function Hero() {
             Free and open source (MIT) · v{version} · Windows 10 &amp; 11 · Per-user install, no admin prompt
           </p>
         </div>
-        <Suspense fallback={<div className="x-demo-skeleton" aria-hidden />}>
-          <Demo base={BASE} />
-        </Suspense>
+        <DemoSlot />
       </div>
     </section>
   );

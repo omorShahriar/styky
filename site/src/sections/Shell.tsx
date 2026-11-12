@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
-import { ANALYTICS_SENTENCE, config, NETWORK_STATEMENT } from "../config";
+import { ANALYTICS_SENTENCE, config, NETWORK_STATEMENT, SHOW_AGENT_FEATURES } from "../config";
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -13,18 +13,23 @@ export function Github({ size = 18 }: { size?: number; strokeWidth?: number }) {
   );
 }
 
+type Theme = "light" | "dark";
+/** The theme lives on <html data-theme> (set before first paint by the inline script in each page). */
+const readTheme = (): Theme => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+const subscribeTheme = (cb: () => void) => {
+  const mo = new MutationObserver(cb);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => mo.disconnect();
+};
+
 /** Light/dark switch. `onChange` lets the homepage keep the live demo's mocked theme setting in step. */
 export function ThemeToggle({ onChange }: { onChange?: (t: "light" | "dark") => void }) {
-  // `document` does not exist while the legal pages are prerendered at build time.
-  const [theme, setTheme] = useState(() =>
-    typeof document === "undefined" ? "light" : (document.documentElement.dataset.theme ?? "light"),
-  );
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
+  // The server snapshot is "light" (no `document` at build time); on the client React re-renders with the real theme after
+  // hydrating, so a dark visitor gets no hydration mismatch.
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, (): Theme => "light");
   const toggle = () => {
     const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
+    document.documentElement.dataset.theme = next;
     onChange?.(next);
     try {
       localStorage.setItem("styky-theme", next);
@@ -78,6 +83,7 @@ export function Footer() {
             <a href={config.licenseUrl} rel="noopener">
               MIT License
             </a>
+            {SHOW_AGENT_FEATURES ? <a href={`${BASE}mcp`}>MCP server</a> : null}
             <a href={`${BASE}refund`}>Refund policy</a>
             <a href={`${BASE}terms`}>Terms</a>
             <a href={`${BASE}privacy`}>Privacy</a>

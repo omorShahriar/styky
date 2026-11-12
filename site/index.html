@@ -3,41 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Styky – Desktop Reminders</title>
-    <meta name="description" content="A small desktop reminder widget for Windows 11. It stays visible after Win+D and nudges you with notifications you can act on." />
+    <title>__TITLE__</title>
+    <meta name="description" content="__DESCRIPTION__" />
+    <meta name="robots" content="max-image-preview:large" />
     <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)" />
-    <link rel="canonical" href="__SITE_URL__" />
-    <link rel="icon" type="image/svg+xml" href="__BASE__favicon.svg" />
+    __HEAD__
 
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Styky" />
-    <meta property="og:title" content="Styky – Desktop Reminders" />
-    <meta property="og:description" content="A small desktop reminder widget for Windows 11. It stays visible after Win+D and nudges you with notifications you can act on." />
-    <meta property="og:url" content="__SITE_URL__" />
-    <meta property="og:image" content="__SITE_URL__og.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="The Styky reminder panel on a Windows 11 desktop" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Styky – Desktop Reminders" />
-    <meta name="twitter:description" content="A small desktop reminder widget for Windows 11. It stays visible after Win+D and nudges you with notifications you can act on." />
-    <meta name="twitter:image" content="__SITE_URL__og.png" />
+    __JSONLD__
 
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "Styky",
-        "operatingSystem": "Windows 10, Windows 11",
-        "applicationCategory": "ProductivityApplication",
-        "description": "A small desktop reminder widget for Windows 11. It stays visible after Win+D and nudges you with notifications you can act on.",
-        "url": "__SITE_URL__",
-        "license": "https://opensource.org/license/mit",
-        "author": { "@type": "Person", "name": "Omor Shahriar" },
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-      }
-    </script>
+    <noscript>
+      <!-- The page is prerendered; this only undoes the scroll-reveal fade, which needs JavaScript to run. -->
+      <style>
+        .x-reveal {
+          opacity: 1;
+          transform: none;
+        }
+      </style>
+    </noscript>
 
     <script>
       /* Set the theme before first paint (no flash): saved choice, else the system preference. */
@@ -53,12 +36,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <noscript>
-      <p style="font:16px system-ui;padding:2rem;max-width:40rem;margin:auto">
-        A small desktop reminder widget for Windows 11. It stays visible after Win+D and nudges you with notifications you can act on.
-        <a href="https://github.com/omorShahriar/styky/releases/latest">Download it from GitHub</a>.
-      </p>
-    </noscript>
     <script type="module" src="/src/main.tsx"></script>
     <!-- Channel tagging: rewrites hrefs only (no storage, cookies or network). Runs before React mounts, so any
          Microsoft Store link rendered by React needs the same logic in an effect. -->
