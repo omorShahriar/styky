@@ -62,7 +62,7 @@ function seed(): Item[] {
         priority: 2,
         tag: "api",
         branch: "release/2.3",
-        link: "https://github.com/omorShahriar/styky/releases",
+        link: "https://github.com/smallhingelabs/styky/releases",
         dueAt: now + 2 * HOUR + 15 * MIN,
         bodyMd: "Cut the tag once CI is green.\n\n- [ ] Write the changelog\n- [ ] Tag and push\n- [ ] Announce in the channel",
       },

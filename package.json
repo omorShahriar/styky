@@ -2,7 +2,7 @@
   "name": "styky",
   "private": true,
   "license": "MIT",
-  "repository": "github:omorShahriar/styky",
+  "repository": "github:smallhingelabs/styky",
   "version": "0.2.1",
   "type": "module",
   "scripts": {

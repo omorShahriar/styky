@@ -3,7 +3,7 @@
   Template. scripts/build-msix.ps1 fills in the double-brace tokens.
   Identity Name and Publisher are the real Partner Center values (Product identity page, Store ID 9NZ2ZDFQJLB5).
   They are public package metadata. A -Store build uses them as they are; a local-test build swaps in a test identity.
-  PublisherDisplayName is a build parameter (default "omor.dev"): it has to equal the Partner Center account's
+  PublisherDisplayName is a build parameter (default "Small Hinge Labs"): it has to equal the Partner Center account's
   publisher display name when the package is uploaded. See docs/RELEASING.md.
 -->
 <Package

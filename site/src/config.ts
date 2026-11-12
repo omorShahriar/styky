@@ -5,14 +5,13 @@
  */
 
 export const config = {
-  repo: "omorShahriar/styky",
-  repoUrl: "https://github.com/omorShahriar/styky",
-  releasesUrl: "https://github.com/omorShahriar/styky/releases/latest",
+  repo: "smallhingelabs/styky",
+  repoUrl: "https://github.com/smallhingelabs/styky",
+  releasesUrl: "https://github.com/smallhingelabs/styky/releases/latest",
   /** Static URL: every release also uploads the installer under this unversioned name, so it never needs a redeploy. */
-  downloadUrl: "https://github.com/omorShahriar/styky/releases/latest/download/Styky_x64-setup.exe",
-  licenseUrl: "https://github.com/omorShahriar/styky/blob/main/LICENSE",
-  author: "Omor Shahriar",
-  authorUrl: "https://github.com/omorShahriar",
+  downloadUrl: "https://github.com/smallhingelabs/styky/releases/latest/download/Styky_x64-setup.exe",
+  licenseUrl: "https://github.com/smallhingelabs/styky/blob/main/LICENSE",
+  author: "Small Hinge Labs",
   publisher: "Small Hinge Labs",
   publisherUrl: "https://smallhingelabs.com/",
   contactEmail: "hello@smallhingelabs.com",

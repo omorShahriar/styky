@@ -22,7 +22,7 @@ const manifest = {
   platforms: {
     "windows-x86_64": {
       signature,
-      url: `https://github.com/omorShahriar/styky/releases/download/v${version}/${exe}`,
+      url: `https://github.com/smallhingelabs/styky/releases/download/v${version}/${exe}`,
     },
   },
 };

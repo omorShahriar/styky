@@ -7,7 +7,7 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync } from "node:fs";
 
-const REPO = "omorShahriar/styky";
+const REPO = "smallhingelabs/styky";
 const gh = (path) => JSON.parse(execFileSync("gh", ["api", path], { encoding: "utf8" }));
 const tryGh = (path) => {
   try {

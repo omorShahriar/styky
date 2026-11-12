@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const file = fileURLToPath(new URL("../src/release.json", import.meta.url));
-const repo = "omorShahriar/styky";
+const repo = "smallhingelabs/styky";
 const api = (process.env.GITHUB_API_URL || "https://api.github.com").replace(/\/$/, "");
 const headers = { Accept: "application/vnd.github+json", "User-Agent": "styky-site-build" };
 if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;

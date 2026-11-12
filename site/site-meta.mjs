@@ -160,8 +160,7 @@ export function jsonLdScript({ version, downloadUrl, agent }) {
         softwareVersion: version,
         downloadUrl,
         license: "https://opensource.org/license/mit",
-        // Wording of the author entry is not ours to change (see docs/PRODUCT_CONTEXT.md).
-        author: { "@type": "Person", name: "Omor Shahriar" },
+        author: { "@id": orgId },
         publisher: { "@id": orgId },
         offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
         isPartOf: { "@id": `${siteUrl}#website` },

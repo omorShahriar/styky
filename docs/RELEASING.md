@@ -1,7 +1,7 @@
 # Releasing Styky
 
 Maintainer notes for cutting a release. Installed copies check
-`https://github.com/omorShahriar/styky/releases/latest/download/latest.json` for updates, and every update must be signed
+`https://github.com/smallhingelabs/styky/releases/latest/download/latest.json` for updates, and every update must be signed
 with the Styky updater key.
 
 > The Microsoft Store (MSIX) build is covered at the end of this file.
@@ -27,7 +27,7 @@ with the Styky updater key.
 3. Generate `latest.json` with `node scripts/latest-json.mjs <version> "<release notes>"`, which writes it to the bundle folder.
    It also writes `Styky_x64-setup.exe`, an unversioned copy of the installer, and ends by listing the four files to upload:
    the versioned installer, `Styky_x64-setup.exe`, the `.sig` and `latest.json`. Upload `Styky_x64-setup.exe` to **every** release
-   (step 4): the website links to `https://github.com/omorShahriar/styky/releases/latest/download/Styky_x64-setup.exe`, so the
+   (step 4): the website links to `https://github.com/smallhingelabs/styky/releases/latest/download/Styky_x64-setup.exe`, so the
    download button never needs a redeploy.
 4. Tag and publish:
 
@@ -53,7 +53,7 @@ Mark a release as a *pre-release* if it should not be offered as an update.
   "platforms": {
     "windows-x86_64": {
       "signature": "<contents of Styky_0.2.0_x64-setup.exe.sig>",
-      "url": "https://github.com/omorShahriar/styky/releases/download/v0.2.0/Styky_0.2.0_x64-setup.exe"
+      "url": "https://github.com/smallhingelabs/styky/releases/download/v0.2.0/Styky_0.2.0_x64-setup.exe"
     }
   }
 }
@@ -81,7 +81,7 @@ identity:
 |---|---|
 | Package/Identity/Name | `omor.dev.Styky` |
 | Package/Identity/Publisher | `CN=150ED2D0-F7B0-4A9D-B63F-68D0C7FDD60C` |
-| Package/Properties/PublisherDisplayName | `omor.dev` (build parameter `-PublisherDisplayName`) |
+| Package/Properties/PublisherDisplayName | `Small Hinge Labs` (build parameter `-PublisherDisplayName`) |
 | Package Family Name (PFN) | `omor.dev.Styky_d017wbhzahrzj` |
 | Store ID | `9NZ2ZDFQJLB5` |
 
@@ -91,7 +91,7 @@ Windows uses the PFN for the installed app. Toasts show under the AUMID `omor.de
 the NSIS install's database; Settings → Export / Import moves reminders between the two.
 
 A Partner Center upload is checked against the account's current publisher display name, so build with the
-`-PublisherDisplayName` the account has at that moment (default `omor.dev`):
+`-PublisherDisplayName` the account has at that moment (default `Small Hinge Labs`):
 `.\scripts\build-msix.ps1 -Store -PublisherDisplayName "<name>"`.
 
 ### Build

@@ -6,7 +6,7 @@
   Tauri has no MSIX bundler, so this stages styky.exe + tile assets + AppxManifest.xml and packs them with makeappx.
   The real Partner Center identity (Name omor.dev.Styky and its Publisher CN) lives in packaging\msix\AppxManifest.xml.
   A -Store build uses it as it is; a local-test build replaces it with a test identity so it never collides with the Store app.
-  PublisherDisplayName is a parameter (default "omor.dev"); it has to match the Partner Center account's publisher display
+  PublisherDisplayName is a parameter (default "Small Hinge Labs"); it has to match the Partner Center account's publisher display
   name at upload time, so pass -PublisherDisplayName "..." once the account name changes.
 
   Store upload: .\scripts\build-msix.ps1 -Store               (real identity, unsigned)
@@ -17,7 +17,7 @@ param(
   [switch]$Store,                   # use the manifest template's real identity and skip signing
   [string]$IdentityName = "Styky.LocalTest",   # local-test builds only
   [string]$Publisher = "CN=StykyLocalTest",    # local-test builds only (also the throwaway certificate's subject)
-  [string]$PublisherDisplayName = "omor.dev",
+  [string]$PublisherDisplayName = "Small Hinge Labs",
   [string]$Version,                 # default: tauri.conf.json version + ".0"
   [switch]$Unsigned,                # skip signing (Store upload)
   [switch]$SkipBuild,               # reuse src-tauri\target\release\styky.exe

@@ -191,7 +191,7 @@ Deviations / decisions:
   failure is kept in `quickadd::STARTUP_ERROR` and surfaced via `quickadd_hotkey_error` so Settings shows it too. Known quirk: pressing the
   currently registered combo while recording triggers quick-add instead.
 - **Updater**: `tauri-plugin-updater` + `tauri-plugin-process`, key at `%USERPROFILE%\.tauri\styky.key` (generated with an empty password;
-  outside the repo, `*.key` is also git-ignored), public key in `tauri.conf.json`, endpoint `https://github.com/omorShahriar/styky/releases/latest/download/latest.json` (see docs/RELEASING.md).
+  outside the repo, `*.key` is also git-ignored), public key in `tauri.conf.json`, endpoint `https://github.com/smallhingelabs/styky/releases/latest/download/latest.json` (see docs/RELEASING.md).
   A failed check shows a friendly message. `scripts/build.ps1` loads the key into `TAURI_SIGNING_PRIVATE_KEY` and runs `pnpm tauri build`.
 - **Icon**: `assets/icon.svg` (sticky note, folded corner) -> `pnpm tauri icon assets/icon.svg`; the tray uses the same app icon. The generated
   `android/` and `ios/` icon folders were deleted. Bundle `targets` is `["nsis"]` only.
@@ -206,7 +206,7 @@ Deviations / decisions:
 
 - **Packaging**: `scripts/build-msix.ps1` (`pnpm tauri build --no-bundle`, stage `styky.exe` + generated tile assets + `resources.pri`, `makeappx pack`,
   optional throwaway self-signed signature). Template: `packaging/msix/AppxManifest.xml` (`runFullTrust`, `windows.startupTask` id `StykyStartup`,
-  Enabled by default). Identity Name and Publisher are the real Partner Center values in the template (`-Store` uses them as is; a local-test build swaps in `Styky.LocalTest` / `CN=StykyLocalTest`). PublisherDisplayName is a script parameter, default `omor.dev`.
+  Enabled by default). Identity Name and Publisher are the real Partner Center values in the template (`-Store` uses them as is; a local-test build swaps in `Styky.LocalTest` / `CN=StykyLocalTest`). PublisherDisplayName is a script parameter, default `Small Hinge Labs`.
   Output in `dist-msix/` (git-ignored, with `*.msix/*.pfx/*.cer`). The pfx is deleted right after signing and the key is removed from the cert store.
 - **Detection**: `store.rs` `is_packaged()` (`GetCurrentPackageFullName` != APPMODEL_ERROR_NO_PACKAGE). Cargo feature `store` only forces `is_store()`
   (UI: hides updater) for unpackaged testing; identity-dependent code uses `is_packaged()`.
@@ -309,7 +309,7 @@ What changed (one commit per block, all local):
   (`validated_at` now means "when accepted"). There is no Buy button; the Pro card links "Get Pro" to `https://styky.smallhingelabs.com/pro` (`lib/pro.ts` `PRO_URL`), as does every Pro pill.
 - **About** shows `lib/network.ts` `NETWORK_STATEMENT`; `network.test.ts` compares it byte-for-byte with docs/PRIVACY.md, the README and `site/src/config.ts`.
 - **Docs**: PRO.md, LEMONSQUEEZY.md and STORE.md are untracked + gitignored (still on disk; history not rewritten). STORE.md's engineering content is in RELEASING.md ("Microsoft Store (MSIX) build").
-- **MSIX**: the template holds the real Name and Publisher; `build-msix.ps1 -Store` uses them, a plain run swaps in a test identity; `-PublisherDisplayName` defaults to `omor.dev`.
+- **MSIX**: the template holds the real Name and Publisher; `build-msix.ps1 -Store` uses them, a plain run swaps in a test identity; `-PublisherDisplayName` defaults to `Small Hinge Labs`.
   Verified only by parsing the script and rendering the manifest in both modes (nothing was built or submitted). The submitted package's manifest could not be diffed: no `.msix` exists on disk.
 - **v0.2.0**: versions bumped in `package.json`, `src-tauri/Cargo.toml` (+ lock) and `tauri.conf.json`; `site/` is untouched (it reads release data at build time). `CHANGELOG.md` and `docs/release-notes/v0.2.0.md`.
   `latest-json.mjs` prints the four files to upload.

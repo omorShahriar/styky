@@ -67,4 +67,4 @@ Styky does not collect personal information from anyone, including children.
 ## Changes and contact
 
 If this policy changes, the new version will be published at this address with an updated date. Questions or concerns:
-open an issue at <https://github.com/omorShahriar/styky/issues>.
+open an issue at <https://github.com/smallhingelabs/styky/issues>.

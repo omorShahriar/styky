@@ -19,12 +19,12 @@ claude mcp add styky -- styky mcp             # free: all seven tools
 -->
 <!-- [[/MCP BLOCK]] -->
 
-[![Latest release](https://img.shields.io/github/v/release/omorShahriar/styky?label=download&color=7c5cff)](https://github.com/omorShahriar/styky/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/smallhingelabs/styky?label=download&color=7c5cff)](https://github.com/smallhingelabs/styky/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078d4?logo=windows11&logoColor=white)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white)
 
-[**Download for Windows**](https://github.com/omorShahriar/styky/releases/latest) · [Website](https://styky.smallhingelabs.com/readme) <!-- [[MCP BLOCK]] --><!-- · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal)--><!-- [[/MCP BLOCK]] --> · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
+[**Download for Windows**](https://github.com/smallhingelabs/styky/releases/latest) · [Website](https://styky.smallhingelabs.com/readme) <!-- [[MCP BLOCK]] --><!-- · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal)--><!-- [[/MCP BLOCK]] --> · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
 
 </div>
 
@@ -65,7 +65,7 @@ until it's too late: *deploy on Friday*, *rotate the keys*, *check CI after the 
 
 ## Install
 
-**Download:** grab `Styky_<version>_x64-setup.exe` from the [latest release](https://github.com/omorShahriar/styky/releases/latest)
+**Download:** grab `Styky_<version>_x64-setup.exe` from the [latest release](https://github.com/smallhingelabs/styky/releases/latest)
 and run it.
 
 - It installs **per user**, with no admin prompt, and adds a Start menu entry.
@@ -98,7 +98,7 @@ If Styky is not running you get `Styky isn't running` and exit code 2.
 
 ### Install
 
-Install Styky from the [GitHub installer](https://github.com/omorShahriar/styky/releases/latest) (v0.2.0 or newer). It
+Install Styky from the [GitHub installer](https://github.com/smallhingelabs/styky/releases/latest) (v0.2.0 or newer). It
 adds `<install dir>\bin\styky.exe` to your user `PATH`. Check with:
 
 ```powershell
@@ -273,7 +273,7 @@ You need Windows 10/11, [Node.js](https://nodejs.org) 20+ with [pnpm](https://pn
 (`stable-x86_64-pc-windows-msvc`), and the Visual Studio 2022 Build Tools with the **Desktop development with C++** workload.
 
 ```powershell
-git clone https://github.com/omorShahriar/styky.git
+git clone https://github.com/smallhingelabs/styky.git
 cd styky
 pnpm install
 pnpm tauri dev          # run with hot reload
