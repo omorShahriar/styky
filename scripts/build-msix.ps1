@@ -63,20 +63,28 @@ $signtool = Find-SdkTool "signtool.exe"
 # --- release build (no installer bundles)
 if (-not $SkipBuild) {
   $ErrorActionPreference = "Continue"   # native stderr (cargo/tauri progress) must not abort the script
-  pnpm tauri build --no-bundle
+  # The CLI (styky-cli) ships as bin\styky.exe behind the `styky` execution alias, as in the NSIS build.
+  cargo build --release --bin styky-cli --manifest-path src-tauri\Cargo.toml
   $code = $LASTEXITCODE
+  if ($code -eq 0) {
+    pnpm tauri build --no-bundle
+    $code = $LASTEXITCODE
+  }
   $ErrorActionPreference = "Stop"
   $LASTEXITCODE = $code
-  if ($LASTEXITCODE -ne 0) { throw "tauri build failed" }
+  if ($LASTEXITCODE -ne 0) { throw "release build failed" }
 }
 $exe = "src-tauri\target\release\styky.exe"
-if (-not (Test-Path $exe)) { throw "$exe not found" }
+$cli = "src-tauri\target\release\styky-cli.exe"
+foreach ($f in $exe, $cli) { if (-not (Test-Path $f)) { throw "$f not found" } }
 
 # --- stage
 $stage = Join-Path $OutDir "stage"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force (Join-Path $stage "Assets") | Out-Null
+New-Item -ItemType Directory -Force (Join-Path $stage "bin") | Out-Null
 Copy-Item $exe (Join-Path $stage "styky.exe")
+Copy-Item $cli (Join-Path $stage "bin\styky.exe")
 
 # Tile assets are resized from the app icon; scale variants are resolved through resources.pri.
 Add-Type -AssemblyName System.Drawing

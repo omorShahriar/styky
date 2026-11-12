@@ -10,8 +10,9 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap5 rescap">
+  IgnorableNamespaces="uap uap5 desktop4 rescap">
 
   <Identity Name="omor.dev.Styky" Publisher="CN=150ED2D0-F7B0-4A9D-B63F-68D0C7FDD60C" Version="{{VERSION}}" ProcessorArchitecture="x64" />
 
@@ -30,7 +31,7 @@
   </Resources>
 
   <Applications>
-    <Application Id="Styky" Executable="styky.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="Styky" Executable="styky.exe" EntryPoint="Windows.FullTrustApplication" desktop4:SupportsMultipleInstances="true">
       <uap:VisualElements
         DisplayName="Styky"
         Description="Always-visible work reminders that live on your desktop."
@@ -42,6 +43,16 @@
         <!-- Launch at login. Enabled by default; the user can switch it off in Task Manager > Startup apps. -->
         <uap5:Extension Category="windows.startupTask" Executable="styky.exe" EntryPoint="Windows.FullTrustApplication">
           <uap5:StartupTask TaskId="StykyStartup" Enabled="true" DisplayName="Styky" />
+        </uap5:Extension>
+        <!-- The command-line client (CLI and `styky mcp`), staged as bin\styky.exe, behind the `styky` alias. It hangs off this
+             application with its own Executable, like Windows Terminal's wt.exe: a separate Start-hidden application
+             (AppListEntry="none") is a "headless app", which the Store refuses without the HeadlessAppBypass waiver.
+             A console alias requires SupportsMultipleInstances on the application; the app itself stays single-instance
+             through tauri-plugin-single-instance. -->
+        <uap5:Extension Category="windows.appExecutionAlias" Executable="bin\styky.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap5:AppExecutionAlias desktop4:Subsystem="console">
+            <uap5:ExecutionAlias Alias="styky.exe" />
+          </uap5:AppExecutionAlias>
         </uap5:Extension>
       </Extensions>
     </Application>

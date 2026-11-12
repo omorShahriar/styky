@@ -309,4 +309,4 @@ Issues and pull requests are welcome. Before you open a PR:
 
 ## License
 
-[MIT](LICENSE) © 2026 Omor Shahriar
+[MIT](LICENSE) © 2026 Small Hinge Labs

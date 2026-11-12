@@ -69,7 +69,10 @@ GitHub installer only, so keep the Store listing and any Store-facing copy free 
 ## Microsoft Store (MSIX) build
 
 The Store flavor is the same app packaged as **MSIX** by `scripts/build-msix.ps1`. Microsoft signs Store MSIX packages, so no
-code-signing certificate is involved. The NSIS/GitHub build above is unchanged. The package has no CLI or MCP server yet.
+code-signing certificate is involved. The NSIS/GitHub build above is unchanged. From v0.2.1 the package also carries the CLI
+(`styky-cli.exe`, staged as `bin\styky.exe`) behind the console execution alias `styky.exe` on the main
+application (an `Executable` override, like Windows Terminal's `wt.exe`; a separate Start-hidden application would be a
+"headless app", which Partner Center rejects without a waiver), so `styky` and `styky mcp` work from terminals and MCP clients on Store installs.
 
 ### Package identity
 
