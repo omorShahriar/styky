@@ -4,6 +4,7 @@ import { APPROVED_DESCRIPTION, config, SHOW_AGENT_FEATURES, TAGLINE } from "../c
 import { setSiteTheme } from "../mock/site-theme";
 import { release } from "../release";
 import { Github, ThemeToggle } from "./Shell";
+import { StoreLink } from "./util";
 
 /** The demo pulls in the whole app UI (motion, markdown, the date parser): load it after first paint. */
 const Demo = lazy(() => import("../demo/Demo"));
@@ -78,9 +79,9 @@ export function Hero() {
             </>
           )}
           <div className="x-cta">
-            <a className="x-btn primary" href={config.downloadUrl} rel="noopener">
-              <Download size={18} strokeWidth={2} /> Download for Windows
-            </a>
+            <StoreLink className="x-btn primary">
+              <Download size={18} strokeWidth={2} /> Get it from Microsoft Store
+            </StoreLink>
             <a className="x-stars" href={config.repoUrl} rel="noopener" aria-label={`Star Styky on GitHub${stars != null ? `, ${stars} stars` : ""}`}>
               <Star size={16} strokeWidth={2} fill="currentColor" />
               {stars != null && stars >= 10 ? <span className="tnum">{stars.toLocaleString()}</span> : null}
@@ -99,7 +100,14 @@ export function Hero() {
             </pre>
           ) : null}
           <p className="x-meta">
-            Free and open source (MIT) · v{version} · Windows 10 &amp; 11 · Per-user install, no admin prompt
+            Free and open source (MIT) · v{version} · Windows 10 &amp; 11 · No admin prompt
+          </p>
+          <p className="x-meta">
+            Prefer a direct download?{" "}
+            <a href={config.downloadUrl} rel="noopener">
+              Get the installer from GitHub
+            </a>
+            .
           </p>
         </div>
         <DemoSlot />
