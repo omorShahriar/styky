@@ -10,6 +10,8 @@ export const config = {
   releasesUrl: "https://github.com/smallhingelabs/styky/releases/latest",
   /** Static URL: every release also uploads the installer under this unversioned name, so it never needs a redeploy. */
   downloadUrl: "https://github.com/smallhingelabs/styky/releases/latest/download/Styky_x64-setup.exe",
+  /** The Microsoft Store listing: the main install route (no SmartScreen prompt, updates through the Store). */
+  storeUrl: "https://apps.microsoft.com/detail/9NZ2ZDFQJLB5",
   licenseUrl: "https://github.com/smallhingelabs/styky/blob/main/LICENSE",
   author: "Small Hinge Labs",
   publisher: "Small Hinge Labs",

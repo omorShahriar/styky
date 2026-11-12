@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Check, Copy, Plus } from "lucide-react";
 import { config } from "../config";
 import { Footer, LegalNav } from "./Shell";
+import { StoreLink } from "./util";
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -231,8 +232,8 @@ const FAQ: { q: string; a: ReactNode }[] = [
     q: "Does the Microsoft Store version include it?",
     a: (
       <p>
-        No. The Microsoft Store build is not live yet, and the CLI and MCP server are not part of it. They ship with the
-        installer on GitHub Releases.
+        Yes, from v0.2.1. The Store version adds the <code>styky</code> command through an app execution alias, so it
+        works in a new terminal right after install. The GitHub installer puts the same command on your PATH instead.
       </p>
     ),
   },
@@ -316,17 +317,14 @@ export function McpPage() {
             <ul>
               <li>Windows 10 (version 1809 or newer) or Windows 11, 64-bit.</li>
               <li>
-                Styky v0.2.0 or newer, from the{" "}
+                Styky from the <StoreLink>Microsoft Store</StoreLink> (v0.2.1 or newer), or v0.2.0 or newer from the{" "}
                 <a href={config.downloadUrl} rel="noopener">
                   installer on GitHub Releases
                 </a>
-                . It puts the <code>styky</code> command on your user PATH.
+                . Both give you the <code>styky</code> command in any new terminal.
               </li>
               <li>The Styky app running. It starts with Windows by default.</li>
             </ul>
-            <p>
-              The Microsoft Store build does not include the MCP server yet. Use the GitHub installer.
-            </p>
             <p>
               To check the install, open a new terminal and run <code>styky ls --today</code>. It lists today&rsquo;s
               reminders, or says that Styky isn&rsquo;t running.
@@ -457,11 +455,9 @@ export function McpPage() {
             <h2 id="download-h">Get Styky</h2>
             <p>Free, open source, MIT licensed. Windows 10 and 11.</p>
             <div className="x-mcp-cta-row">
-              <a className="x-btn primary" href={config.downloadUrl} rel="noopener">
-                Download for Windows
-              </a>
-              <a className="x-btn secondary" href={config.repoUrl} rel="noopener">
-                View on GitHub
+              <StoreLink className="x-btn primary">Get it from Microsoft Store</StoreLink>
+              <a className="x-btn secondary" href={config.downloadUrl} rel="noopener">
+                Installer from GitHub
               </a>
             </div>
           </section>

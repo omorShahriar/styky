@@ -177,9 +177,9 @@ export function readVersion(root) {
   return JSON.parse(fs.readFileSync(`${root}/src/release.json`, "utf8")).version;
 }
 
-/** The static installer URL. Read from src/config.ts so it exists in one place only (that file cannot be imported in Node). */
+/** The Microsoft Store listing, used as the JSON-LD downloadUrl. Read from src/config.ts so it exists in one place only (that file cannot be imported in Node). */
 export function readDownloadUrl(root) {
-  const m = /downloadUrl:\s*"([^"]+)"/.exec(fs.readFileSync(`${root}/src/config.ts`, "utf8"));
-  if (!m) throw new Error("site-meta: downloadUrl not found in src/config.ts");
+  const m = /storeUrl:\s*"([^"]+)"/.exec(fs.readFileSync(`${root}/src/config.ts`, "utf8"));
+  if (!m) throw new Error("site-meta: storeUrl not found in src/config.ts");
   return m[1];
 }

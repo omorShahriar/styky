@@ -12,7 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { config, NETWORK_STATEMENT, SHOW_AGENT_FEATURES } from "../config";
-import { Reveal, SectionHead } from "./util";
+import { Reveal, SectionHead, StoreLink } from "./util";
 
 export function Problem() {
   const steps = [
@@ -233,7 +233,10 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     a: (
       <>
         <p>
-          Styky is a new, independent app and the installer is not code-signed yet, so Windows SmartScreen shows
+          Install from the <StoreLink>Microsoft Store</StoreLink> to skip the warning: Microsoft signs the Store version.
+        </p>
+        <p>
+          The installer on GitHub is not code-signed yet, so Windows SmartScreen shows
           &ldquo;Windows protected your PC&rdquo; for files it hasn&rsquo;t seen often. Click <b>More info</b>, then{" "}
           <b>Run anyway</b>.
         </p>
@@ -316,10 +319,9 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     q: "Is there a Microsoft Store version?",
     a: (
       <p>
-        A Store listing is in review.
-        {SHOW_AGENT_FEATURES
-          ? " The CLI and MCP server ship with the installer on GitHub Releases; the Store build does not include them yet."
-          : ""}
+        Yes. <StoreLink>Get Styky from the Microsoft Store</StoreLink>. It is the same app and updates through the Store
+        {SHOW_AGENT_FEATURES ? ", and it includes the styky command and the MCP server" : ""}. The installer on GitHub
+        Releases updates itself instead.
       </p>
     ),
   },

@@ -24,7 +24,7 @@ claude mcp add styky -- styky mcp             # free: all seven tools
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078d4?logo=windows11&logoColor=white)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24c8db?logo=tauri&logoColor=white)
 
-[**Download for Windows**](https://github.com/smallhingelabs/styky/releases/latest) · [Website](https://styky.smallhingelabs.com/readme) <!-- [[MCP BLOCK]] --><!-- · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal)--><!-- [[/MCP BLOCK]] --> · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
+[**Get it from Microsoft Store**](https://apps.microsoft.com/detail/9NZ2ZDFQJLB5?cid=readme) · [Installer](https://github.com/smallhingelabs/styky/releases/latest) · [Website](https://styky.smallhingelabs.com/readme) <!-- [[MCP BLOCK]] --><!-- · [Claude, ChatGPT & terminal](#use-it-from-claude-chatgpt-and-the-terminal)--><!-- [[/MCP BLOCK]] --> · [Quick add](#quick-add-type-it-like-you-say-it) · [Styky Pro](#styky-pro) · [Build from source](#build-from-source)
 
 </div>
 
@@ -65,8 +65,11 @@ until it's too late: *deploy on Friday*, *rotate the keys*, *check CI after the 
 
 ## Install
 
-**Download:** grab `Styky_<version>_x64-setup.exe` from the [latest release](https://github.com/smallhingelabs/styky/releases/latest)
-and run it.
+**Microsoft Store (recommended):** [get Styky from the Microsoft Store](https://apps.microsoft.com/detail/9NZ2ZDFQJLB5?cid=readme). Microsoft signs the Store version, so
+there is no SmartScreen prompt, and it updates through the Store.
+
+**Installer:** or grab `Styky_<version>_x64-setup.exe` from the [latest release](https://github.com/smallhingelabs/styky/releases/latest)
+and run it. It updates itself from GitHub Releases.
 
 - It installs **per user**, with no admin prompt, and adds a Start menu entry.
 <!-- [[MCP BLOCK]] -->
@@ -76,14 +79,13 @@ and run it.
 <!-- [[/MCP BLOCK]] -->
 - Styky starts at login by default. You can change that in Settings.
 - Requires Windows 10 1809+ / Windows 11 (the WebView2 runtime is already part of Windows 11).
-- **Microsoft Store:** a listing is in review.
 <!-- [[MCP BLOCK]] -->
 <!--
-- **Microsoft Store:** a listing is in review. The Store build does not include the `styky` CLI or MCP server yet; use the GitHub installer for those.
+- Both the Store version (from v0.2.1) and the installer give you the `styky` command in any new terminal.
 -->
 <!-- [[/MCP BLOCK]] -->
 
-> Windows SmartScreen may warn about an unrecognized app because the installer isn't Authenticode-signed yet. Click
+> With the GitHub installer, Windows SmartScreen may warn about an unrecognized app because it isn't Authenticode-signed yet. Click
 > **More info → Run anyway**. Updates are cryptographically signed and verified by the app itself.
 
 Uninstall from *Settings → Apps → Installed apps → Styky*. Your data is kept (see [Your data](#your-data)).

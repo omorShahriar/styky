@@ -77,6 +77,9 @@ export function Footer() {
             <a href={config.repoUrl} rel="noopener">
               GitHub
             </a>
+            <a href={config.storeUrl} rel="noopener">
+              Microsoft Store
+            </a>
             <a href={config.releasesUrl} rel="noopener">
               Releases
             </a>
