@@ -1,0 +1,15 @@
+export const base: string;
+export const siteUrl: string;
+export const siteName: string;
+export const publisher: { name: string; url: string };
+export const approvedDescription: string;
+export const pages: Record<string, { path: string; title: string; description: string; noindex?: boolean; agentOnly?: boolean }>;
+export function sitemapFor(agent: boolean): { name: string; loc: string }[];
+export function rewritePaths(agent: boolean): string[];
+export function redirectsFile(agent: boolean): string;
+export const agentIndex: { title: string; description: string };
+export function pageMeta(name: string, agent: boolean): { path: string; title: string; description: string; noindex?: boolean; agentOnly?: boolean };
+export function headTags(name: string, agent: boolean): string;
+export function jsonLdScript(o: { version: string; downloadUrl: string; agent: boolean }): string;
+export function readVersion(root: string): string;
+export function readDownloadUrl(root: string): string;

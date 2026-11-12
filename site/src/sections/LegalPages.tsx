@@ -109,7 +109,26 @@ function Privacy() {
   );
 }
 
-const PAGES = { refund: Refund, terms: Terms, privacy: Privacy } as const;
+/** 404.html: served by Cloudflare Pages for any unknown path (a top-level 404.html turns its SPA fallback off). */
+function NotFound() {
+  return (
+    <>
+      <LegalNav />
+      <main className="x-legal">
+        <div className="x-wrap">
+          <h1>Page not found</h1>
+          <p>There is nothing at this address.</p>
+          <p>
+            <a href={BASE}>Go to the Styky homepage</a>
+          </p>
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+const PAGES = { refund: Refund, terms: Terms, privacy: Privacy, "404": NotFound } as const;
 export type LegalPageName = keyof typeof PAGES;
 
 export function LegalPage({ name }: { name: LegalPageName }) {

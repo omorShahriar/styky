@@ -1,10 +1,15 @@
 import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, hydrateRoot } from "react-dom/client";
 import "./styles/site.css";
 import App from "./App";
 
-createRoot(document.getElementById("root") as HTMLElement).render(
+const root = document.getElementById("root") as HTMLElement;
+const app = (
   <StrictMode>
     <App />
-  </StrictMode>,
+  </StrictMode>
 );
+
+// `pnpm build` prerenders the page into dist/index.html (scripts/prerender.mjs): hydrate it. The dev server serves an empty root.
+if (root.hasChildNodes()) hydrateRoot(root, app);
+else createRoot(root).render(app);

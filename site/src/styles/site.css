@@ -1034,6 +1034,8 @@ kbd {
   border-radius: 20px;
   background: var(--wp-base);
   box-shadow: 0 0 0 0.5px var(--stage-edge);
+  /* the mounted demo adds its footer row below the stage (.x-demo-foot: 40px + 16px margin); reserve it so nothing shifts */
+  margin-bottom: 56px;
 }
 @media (max-width: 759px) {
   .x-demo-skeleton {
